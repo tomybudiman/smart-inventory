@@ -421,6 +421,13 @@
       padding: 12px 16px;
       animation: msgFadeIn 0.2s ease-out;
     }
+    .gemini-msg-bot.gemini-proposal {
+      max-width: 100%;
+      width: 100%;
+    }
+    .gemini-proposal .list-group-item {
+      background: transparent;
+    }
     @media (max-width: 576px) {
       .gemini-chat-window {
         width: calc(100vw - 20px);
@@ -1045,6 +1052,9 @@
         </div>
         <div>
           Halo! Saya asisten pintar inventaris yang ditenagai oleh <strong>Google Gemini</strong>. Saya terhubung langsung dengan database inventaris Anda untuk menjawab pertanyaan stok, lokasi, maupun kondisi barang.
+        </div>
+        <div class="mt-2">
+          Saya juga bisa <strong>menambahkan barang baru</strong>, misalnya: <em>"Tambah 5 laptop Asus kondisi baik di Lab Komputer 2"</em>. Barang tersimpan setelah Anda menekan <strong>Simpan</strong> pada kartu konfirmasi.
         </div>
         <div class="mt-2 text-muted" style="font-size: 0.78rem;">
           Coba tanyakan beberapa hal berikut:
@@ -2143,6 +2153,168 @@ ${itemList.join("\n")}`;
       }
     }
 
+    // -------------------------------------------------------------
+    // TAMBAH BARANG VIA AI (Function Calling + Kartu Konfirmasi)
+    // Gemini hanya mengusulkan draft; data baru ditulis ke database
+    // setelah petugas menekan "Simpan" pada kartu konfirmasi di chat.
+    // -------------------------------------------------------------
+    // Pilihan kategori & kondisi diambil dari form Tambah Barang agar selalu sama
+    const KATEGORI_OPTIONS = Array.from(kategoriInput.options).map(o => o.value).filter(Boolean);
+    const KONDISI_OPTIONS = Array.from(kondisiInput.options).map(o => o.value).filter(Boolean);
+
+    const GEMINI_TOOLS = [{
+      function_declarations: [{
+        name: "usulkanTambahBarang",
+        description: "Menampilkan draft barang baru kepada petugas sebagai kartu konfirmasi. Data BELUM tersimpan sampai petugas menekan tombol Simpan pada kartu.",
+        parameters: {
+          type: "object",
+          properties: {
+            items: {
+              type: "array",
+              description: "Daftar barang yang akan ditambahkan, satu entri per jenis barang.",
+              items: {
+                type: "object",
+                properties: {
+                  namaBarang: { type: "string", description: "Nama barang, misalnya 'Laptop Asus Vivobook 14'." },
+                  kategori: { type: "string", enum: KATEGORI_OPTIONS, description: "Kategori barang." },
+                  jumlah: { type: "integer", description: "Jumlah unit fisik, minimal 1." },
+                  kondisi: { type: "string", enum: KONDISI_OPTIONS, description: "Kondisi barang." },
+                  lokasi: { type: "string", description: "Nama ruangan atau lokasi penyimpanan." }
+                },
+                required: ["namaBarang", "kategori", "jumlah", "kondisi", "lokasi"]
+              }
+            }
+          },
+          required: ["items"]
+        }
+      }]
+    }];
+
+    // Validasi ulang usulan AI dengan aturan yang sama seperti form Tambah Barang
+    function validateProposedItem(raw) {
+      const item = {
+        namaBarang: String(raw?.namaBarang ?? "").trim(),
+        kategori: String(raw?.kategori ?? "").trim(),
+        jumlah: Number(raw?.jumlah),
+        kondisi: String(raw?.kondisi ?? "").trim(),
+        lokasi: String(raw?.lokasi ?? "").trim()
+      };
+      const errors = [];
+      if (!item.namaBarang) errors.push("nama barang kosong");
+      if (!KATEGORI_OPTIONS.includes(item.kategori)) errors.push(`kategori "${item.kategori || "-"}" tidak dikenal`);
+      if (!Number.isInteger(item.jumlah) || item.jumlah < 1) errors.push("jumlah harus bilangan bulat minimal 1");
+      if (!KONDISI_OPTIONS.includes(item.kondisi)) errors.push(`kondisi "${item.kondisi || "-"}" tidak dikenal`);
+      if (!item.lokasi) errors.push("lokasi kosong");
+      return { item, errors };
+    }
+
+    // Catatan usulan untuk riwayat chat. Disimpan sebagai teks (bukan functionCall)
+    // agar riwayat tetap valid walaupun model fallback berganti di tengah percakapan.
+    function buildProposalHistoryNote(entries, status) {
+      const list = entries
+        .map(({ item }) => `${item.namaBarang || "?"} (${item.jumlah} unit, ${item.kategori}, ${item.kondisi}, lokasi: ${item.lokasi})`)
+        .join("; ");
+      return `[SISTEM] Draft penambahan barang ditampilkan sebagai kartu konfirmasi: ${list}. Status: ${status}.`;
+    }
+
+    function appendProposalCard(rawItems, historyEntry, replyText) {
+      const entries = rawItems.map(validateProposedItem);
+      const validItems = entries.filter(e => e.errors.length === 0).map(e => e.item);
+      const existingLocations = new Set(
+        Object.values(inventoryData).map(i => (i.lokasi || "").trim().toLowerCase()).filter(Boolean)
+      );
+      const isNewLocation = (item) => Boolean(item.lokasi) && !existingLocations.has(item.lokasi.toLowerCase());
+      const hasNewLocation = entries.some(e => e.errors.length === 0 && isNewLocation(e.item));
+
+      const setHistoryStatus = (status) => {
+        historyEntry.parts[0].text = (replyText ? replyText + "\n\n" : "") + buildProposalHistoryNote(entries, status);
+      };
+      setHistoryStatus("menunggu konfirmasi petugas");
+
+      const rowsHtml = entries.map(({ item, errors }) => `
+        <div class="list-group-item px-0 py-2">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <span class="fw-semibold">${escapeHtml(item.namaBarang) || "<em>(tanpa nama)</em>"}</span>
+            <span class="fw-semibold text-nowrap">${Number.isFinite(item.jumlah) ? item.jumlah : "?"} unit</span>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-1 mt-1 text-muted" style="font-size: 0.78rem;">
+            <span>${escapeHtml(item.kategori) || "-"}</span>
+            <span>&bull;</span>
+            ${getKondisiBadge(escapeHtml(item.kondisi))}
+            <span>&bull;</span>
+            <span><i class="bi bi-geo-alt-fill text-danger"></i> ${escapeHtml(item.lokasi) || "-"}</span>
+            ${isNewLocation(item) ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Lokasi baru</span>' : ""}
+          </div>
+          ${errors.length ? `<div class="text-danger mt-1" style="font-size: 0.75rem;"><i class="bi bi-exclamation-circle me-1"></i>${escapeHtml(errors.join("; "))} &mdash; tidak akan disimpan.</div>` : ""}
+        </div>`).join("");
+
+      const card = document.createElement("div");
+      card.className = "gemini-msg gemini-msg-bot gemini-proposal";
+      card.innerHTML = `
+        <div class="d-flex align-items-center gap-1 mb-1 text-primary fw-semibold" style="font-size: 0.78rem;">
+          <i class="bi bi-clipboard-plus"></i>
+          <span>Draft Tambah Barang (${entries.length})</span>
+        </div>
+        <div class="list-group list-group-flush">${rowsHtml}</div>
+        ${hasNewLocation ? `<div class="text-muted mt-2" style="font-size: 0.75rem;"><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Lokasi baru</span> belum ada barang lain di lokasi ini. Pastikan penulisannya sudah benar.</div>` : ""}
+        <div class="proposal-status text-muted mt-2" style="font-size: 0.75rem;">Periksa dulu. Barang baru tersimpan setelah Anda menekan <strong>Simpan</strong>.</div>
+        <div class="proposal-actions d-flex gap-2 mt-2">
+          <button type="button" class="btn btn-primary btn-sm rounded-3 fw-semibold d-flex align-items-center gap-1 btn-proposal-save" ${validItems.length ? "" : "disabled"}>
+            <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+            <i class="bi bi-check2"></i>
+            <span>Simpan ${validItems.length} Barang</span>
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-3 btn-proposal-cancel">Batal</button>
+        </div>`;
+
+      const statusEl = card.querySelector(".proposal-status");
+      const actionsEl = card.querySelector(".proposal-actions");
+      const btnSave = card.querySelector(".btn-proposal-save");
+      const btnCancel = card.querySelector(".btn-proposal-cancel");
+      const saveSpinner = btnSave.querySelector(".spinner-border");
+
+      btnCancel.addEventListener("click", () => {
+        actionsEl.remove();
+        statusEl.innerHTML = '<i class="bi bi-x-circle me-1"></i>Dibatalkan. Tidak ada data yang disimpan.';
+        setHistoryStatus("dibatalkan oleh petugas, tidak disimpan");
+      });
+
+      btnSave.addEventListener("click", async () => {
+        if (!currentUser || !db || !isFirebaseConfigured) {
+          statusEl.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Silakan login terlebih dahulu sebelum menyimpan.</span>';
+          return;
+        }
+
+        btnSave.disabled = true;
+        btnCancel.disabled = true;
+        saveSpinner.classList.remove("d-none");
+
+        // Multi-path update: semua barang tersimpan sekaligus, atau tidak sama sekali
+        const updatedAt = new Date().toISOString();
+        const updates = {};
+        validItems.forEach((item) => {
+          updates[push(inventarisRef).key] = { ...item, createdBy: currentUser.email, updatedAt };
+        });
+
+        try {
+          await update(inventarisRef, updates);
+          actionsEl.remove();
+          statusEl.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>${validItems.length} barang berhasil ditambahkan ke inventaris.</span>`;
+          setHistoryStatus("sudah disimpan ke database oleh petugas");
+          showToast(`${validItems.length} barang baru berhasil ditambahkan!`);
+        } catch (error) {
+          console.error("Gagal menyimpan barang dari AI:", error);
+          statusEl.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Gagal menyimpan. Periksa koneksi dan security rules, lalu coba lagi.</span>';
+          btnSave.disabled = false;
+          btnCancel.disabled = false;
+          saveSpinner.classList.add("d-none");
+        }
+      });
+
+      geminiMessages.appendChild(card);
+      scrollToBottom();
+    }
+
     // Panggil Endpoint Gemini API (dengan Auto-Fallback Model)
     async function requestGeminiAPI(conversationHistory, modelToUse, apiKey) {
       const inventoryContext = getInventoryContextSummary();
@@ -2156,6 +2328,13 @@ Tugas utama Anda:
 3. Membantu membuat rekap atau draft laporan inventaris yang rapi jika diminta oleh petugas.
 4. Gunakan Bahasa Indonesia yang ramah, profesional, ringkas, dan solutif.
 5. Format teks dengan rapi menggunakan Markdown (gunakan bullet points, bold untuk penekanan, atau tabel ringkas bila relevan).
+6. Jika petugas meminta menambahkan barang baru, panggil fungsi usulkanTambahBarang berisi semua barang yang diminta. Fungsi ini hanya menampilkan draft; barang baru tersimpan setelah petugas menekan tombol "Simpan" pada kartu konfirmasi. Jangan pernah menyatakan barang sudah tersimpan.
+   - Nama barang dan lokasi wajib jelas. Jika belum disebutkan, tanyakan dulu dan jangan menebak.
+   - Jika jumlah tidak disebutkan, gunakan 1. Jika kondisi tidak disebutkan, gunakan "Baik".
+   - Pilih kategori yang paling sesuai dari pilihan yang tersedia.
+   - Jika lokasi yang disebut merujuk ke ruangan yang sudah ada di data, tulis nama lokasinya persis seperti di data.
+7. Anda tidak dapat mengubah atau menghapus data barang. Jika diminta, arahkan petugas memakai tombol Edit atau Hapus di tabel inventaris.
+8. Baris berawalan [SISTEM] di riwayat percakapan dibuat otomatis oleh aplikasi. Jangan menulis baris seperti itu sendiri.
 
 === DATA INVENTARIS REALTIME SAAT INI ===
 ${inventoryContext}
@@ -2170,6 +2349,7 @@ Jika pengguna bertanya tentang barang atau ruangan yang tidak tercantum dalam da
       const payload = {
         system_instruction: systemInstruction,
         contents: conversationHistory,
+        tools: GEMINI_TOOLS,
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 2048
@@ -2209,11 +2389,19 @@ Jika pengguna bertanya tentang barang atau ruangan yang tidak tercantum dalam da
           }
 
           const data = await response.json();
-          const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!replyText) {
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          const replyText = parts
+            .filter(p => typeof p.text === "string" && !p.thought)
+            .map(p => p.text)
+            .join("")
+            .trim();
+          const proposedItems = parts
+            .filter(p => p.functionCall?.name === "usulkanTambahBarang")
+            .flatMap(p => Array.isArray(p.functionCall.args?.items) ? p.functionCall.args.items : []);
+          if (!replyText && proposedItems.length === 0) {
             throw new Error("Respon teks dari model Gemini kosong.");
           }
-          return { replyText, activeModel: m };
+          return { replyText, proposedItems, activeModel: m };
         } catch (err) {
           lastError = err;
           if (err.message && (err.message.includes("404") || err.message.toLowerCase().includes("not found"))) {
@@ -2267,21 +2455,27 @@ Agar asisten AI dapat menjawab:<br>
       showTypingIndicator();
 
       try {
-        const { replyText, activeModel } = await requestGeminiAPI(geminiChatHistory, currentModel, apiKey);
+        const { replyText, proposedItems, activeModel } = await requestGeminiAPI(geminiChatHistory, currentModel, apiKey);
         hideTypingIndicator();
 
-        // Simpan respon AI ke history
-        geminiChatHistory.push({
+        // Simpan respon AI ke history (teksnya dilengkapi catatan usulan oleh appendProposalCard)
+        const historyEntry = {
           role: "model",
           parts: [{ text: replyText }]
-        });
+        };
+        geminiChatHistory.push(historyEntry);
 
         // Update badge jika ada fallback model yang dipakai
         if (activeModel && activeModel !== currentModel) {
           geminiModelBadge.textContent = activeModel;
         }
 
-        appendChatMessage("bot", replyText, true);
+        if (replyText) {
+          appendChatMessage("bot", replyText, true);
+        }
+        if (proposedItems.length > 0) {
+          appendProposalCard(proposedItems, historyEntry, replyText);
+        }
       } catch (error) {
         hideTypingIndicator();
         console.error("Gemini API Error:", error);

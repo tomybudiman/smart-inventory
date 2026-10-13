@@ -113,6 +113,7 @@ Aplikasi telah dilengkapi widget chat asisten cerdas ditenagai **Google Gemini A
 
 - **Koneksi Realtime Otomatis**: Asisten AI membaca seluruh data inventaris yang aktif secara otomatis (jumlah unit, nama barang, kategori, kondisi baik/rusak, dan sebaran lokasi ruangan).
 - **Rekomendasi Pintar**: Mampu memberikan analisis kondisi alat lab, rekomendasi jadwal servis, dan SOP perawatan berkala.
+- **Tambah Barang via Chat**: Ketik permintaan seperti *"Tambah 10 kursi lipat dan 2 proyektor Epson di Ruang Rapat"*. Asisten menampilkan kartu konfirmasi berisi draft barang (divalidasi dengan aturan yang sama seperti form, plus penanda *Lokasi baru*), dan barang baru tersimpan ke Realtime Database setelah petugas menekan **Simpan**.
 - **Dukungan Format Markdown**: Respon disajikan rapi dengan poin-poin, penekanan teks penting, dan tabel.
 - **Tombol Salin & Bersihkan**: Memudahkan menyalin jawaban atau mereset percakapan.
 - **Panel Pengaturan Fleksibel**: Pengguna dapat melihat status koneksi Railway atau menguji API Key secara lokal via ikon ⚙️ Pengaturan di dalam widget chat.
