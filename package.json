@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite --open",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:cloudrun": "vite build --mode cloudrun",
+    "deploy:cloudrun": "npm run build:cloudrun && gcloud run deploy smart-inventory --source . --region asia-southeast2 --allow-unauthenticated --max-instances 2"
   },
   "devDependencies": {
     "vite": "^5.4.11"

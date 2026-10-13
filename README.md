@@ -136,3 +136,16 @@ Aplikasi dibangun menggunakan Vite untuk performa cepat dan kemudahan deployment
    ```
    Folder `dist` siap dideploy ke Railway Static / Web Service.
 
+3. **Deploy ke Google Cloud Run**:
+   ```bash
+   npm run deploy:cloudrun
+   ```
+   Perintah ini membangun aplikasi dengan mode `cloudrun` (`.env.cloudrun`), lalu men-deploy service `smart-inventory` di region `asia-southeast2` ke project gcloud yang aktif. Pada mode ini, Gemini dipanggil lewat proxy `server.mjs`, sehingga API key tidak ikut tertanam di JavaScript dan fitur AI hanya bisa dipakai petugas yang sudah login.
+
+   Pada deploy pertama, tambahkan environment variable server (deploy berikutnya otomatis memakai nilai yang sama):
+   ```bash
+   npm run build:cloudrun
+   gcloud run deploy smart-inventory --source . --region asia-southeast2 --allow-unauthenticated --max-instances 2 \
+     --update-env-vars GEMINI_API_KEY=<gemini_api_key>,FIREBASE_API_KEY=<firebase_web_api_key>
+   ```
+

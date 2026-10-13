@@ -1,0 +1,7 @@
+# Hanya file yang dibutuhkan image Cloud Run yang di-upload ke Cloud Build.
+# dist/ sengaja ikut (dibangun lokal), sedangkan .env tidak ikut ter-upload.
+*
+!Dockerfile
+!server.mjs
+!dist/
+!dist/**

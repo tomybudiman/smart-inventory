@@ -1873,6 +1873,10 @@
     let geminiChatHistory = [];
     let isGeminiWaiting = false;
 
+    // Build Cloud Run (--mode cloudrun) memanggil Gemini lewat proxy server.mjs,
+    // sehingga API key tidak pernah sampai ke browser
+    const GEMINI_PROXY_URL = (env.VITE_GEMINI_PROXY_URL || "").trim();
+
     // Helper: Mendapatkan API Key aktif (Railway Environment vs Local Storage)
     function getActiveGeminiApiKey() {
       return (env.VITE_GEMINI_API_KEY && env.VITE_GEMINI_API_KEY.trim() && !env.VITE_GEMINI_API_KEY.includes("YOUR_GEMINI_API_KEY"))
@@ -1894,7 +1898,12 @@
       geminiModelBadge.textContent = activeModel;
       geminiModelSelect.value = activeModel;
 
-      if (env.VITE_GEMINI_API_KEY && env.VITE_GEMINI_API_KEY.trim() && !env.VITE_GEMINI_API_KEY.includes("YOUR_GEMINI_API_KEY")) {
+      if (GEMINI_PROXY_URL) {
+        geminiApiKeyInput.value = "";
+        geminiApiKeyInput.placeholder = "Dikelola oleh server";
+        geminiApiKeyInput.disabled = true;
+        geminiApiKeyStatusNote.innerHTML = '<span class="text-success fw-semibold"><i class="bi bi-shield-lock-fill me-1"></i>Tersambung via server (API key tersimpan aman di server)</span>';
+      } else if (env.VITE_GEMINI_API_KEY && env.VITE_GEMINI_API_KEY.trim() && !env.VITE_GEMINI_API_KEY.includes("YOUR_GEMINI_API_KEY")) {
         geminiApiKeyInput.value = "••••••••••••••••••••••••";
         geminiApiKeyInput.disabled = true;
         geminiApiKeyStatusNote.innerHTML = '<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>Tersambung via Environment Railway (VITE_GEMINI_API_KEY)</span>';
@@ -2315,6 +2324,25 @@ ${itemList.join("\n")}`;
       scrollToBottom();
     }
 
+    // Kirim satu request generateContent: lewat proxy server (build Cloud Run) atau langsung ke Google
+    async function callGeminiModel(model, payload, apiKey) {
+      if (GEMINI_PROXY_URL) {
+        const idToken = await currentUser.getIdToken();
+        return fetch(`${GEMINI_PROXY_URL}/${encodeURIComponent(model)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      return fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    }
+
     // Panggil Endpoint Gemini API (dengan Auto-Fallback Model)
     async function requestGeminiAPI(conversationHistory, modelToUse, apiKey) {
       const inventoryContext = getInventoryContextSummary();
@@ -2370,12 +2398,7 @@ Jika pengguna bertanya tentang barang atau ruangan yang tidak tercantum dalam da
 
       for (const m of candidateModels) {
         try {
-          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
+          const response = await callGeminiModel(m, payload, apiKey);
 
           if (!response.ok) {
             const errJson = await response.json().catch(() => ({}));
@@ -2427,8 +2450,13 @@ Jika pengguna bertanya tentang barang atau ruangan yang tidak tercantum dalam da
       geminiChatInput.value = "";
       geminiChatInput.style.height = "auto";
 
-      // Cek apakah API Key sudah ada
-      if (!apiKey) {
+      // Mode proxy butuh token login Firebase; mode langsung butuh API Key
+      if (GEMINI_PROXY_URL) {
+        if (!currentUser) {
+          appendChatMessage("bot", "⚠️ <strong>Silakan login terlebih dahulu</strong> untuk memakai Asisten AI.", false);
+          return;
+        }
+      } else if (!apiKey) {
         const notice = `⚠️ **Gemini API Key belum terkonfigurasi.**<br><br>
 Agar asisten AI dapat menjawab:<br>
 1. <strong>Di Railway:</strong> Buka Project Anda &rarr; <em>Variables</em> &rarr; Tambahkan:<br>
