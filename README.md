@@ -74,6 +74,13 @@ Pilih tab **Rules** pada Realtime Database, lalu masukkan aturan berikut yang **
 ```
 Klik tombol **Publish** untuk menerapkan aturan.
 
+**Aturan dengan validasi data (disarankan).** Repository ini menyertakan `database.rules.json`. Selain mewajibkan login, aturan tersebut memeriksa setiap barang di `/inventaris`: ketujuh field skema (`namaBarang`, `kategori`, `jumlah`, `kondisi`, `lokasi`, `createdBy`, `updatedAt`) wajib ada, `kategori` dan `kondisi` harus salah satu nilai pada form, `jumlah` harus bilangan bulat minimal 1, dan field di luar skema ditolak. Terapkan dengan salah satu cara berikut:
+
+- **Console:** salin isi `database.rules.json` ke tab **Rules**, uji di **Rules Playground**, lalu klik **Publish**.
+- **CLI:** `npx firebase-tools login`, lalu `npx firebase-tools deploy --only database --project <project-id>`.
+
+> Catatan: data lama yang memiliki field di luar skema tetap terbaca, tetapi penyimpanan ulang (edit) barang tersebut akan ditolak. Panjang teks tidak dibatasi. Jika daftar kategori atau kondisi pada form diubah, ubah juga `database.rules.json` (`npm test` akan gagal jika keduanya tidak sama).
+
 ### 5. Atur Kredensial Firebase & Gemini AI (Environment Variables)
 
 Untuk deployment di **Railway / Vercel**:
@@ -149,3 +156,8 @@ Aplikasi dibangun menggunakan Vite untuk performa cepat dan kemudahan deployment
      --update-env-vars GEMINI_API_KEY=<gemini_api_key>,FIREBASE_API_KEY=<firebase_web_api_key>
    ```
 
+4. **Jalankan Pengujian** (Node.js 20.11 atau lebih baru, tanpa dependensi tambahan):
+   ```bash
+   npm test
+   ```
+   Pengujian mencakup logika murni di `src/inventory-logic.mjs` (validasi usulan AI, konteks AI, escape HTML, markdown, pesan error auth), server proxy `server.mjs` (verifikasi token, pembatasan model, penyaringan field, path traversal), dan kesesuaian `database.rules.json` dengan form pada `index.html`.

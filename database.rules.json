@@ -1,0 +1,35 @@
+{
+  "rules": {
+    "inventaris": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$itemId": {
+        ".validate": "newData.hasChildren(['namaBarang', 'kategori', 'jumlah', 'kondisi', 'lokasi', 'createdBy', 'updatedAt'])",
+        "namaBarang": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "kategori": {
+          ".validate": "newData.isString() && (newData.val() == 'Elektronik' || newData.val() == 'ATK' || newData.val() == 'Perabot' || newData.val() == 'Hardware Jaringan')"
+        },
+        "jumlah": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 == 0"
+        },
+        "kondisi": {
+          ".validate": "newData.isString() && (newData.val() == 'Baik' || newData.val() == 'Rusak Ringan' || newData.val() == 'Rusak Berat')"
+        },
+        "lokasi": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "createdBy": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "updatedAt": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

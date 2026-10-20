@@ -6,6 +6,7 @@
     "dev": "vite --open",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test",
     "build:cloudrun": "vite build --mode cloudrun",
     "deploy:cloudrun": "npm run build:cloudrun && gcloud run deploy smart-inventory --source . --region asia-southeast2 --allow-unauthenticated --max-instances 2"
   },

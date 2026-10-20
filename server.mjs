@@ -7,8 +7,12 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 
 const PORT = Number(process.env.PORT) || 8080;
-const DIST_DIR = join(import.meta.dirname, "dist");
+const DIST_DIR = process.env.DIST_DIR || join(import.meta.dirname, "dist");
 const { GEMINI_API_KEY, FIREBASE_API_KEY } = process.env;
+// URL upstream dan DIST_DIR dapat diganti lewat environment variable. Hanya dipakai oleh
+// tests/server.test.mjs; di produksi biarkan kosong agar memakai nilai bawaan di bawah.
+const IDENTITY_TOOLKIT_URL = process.env.IDENTITY_TOOLKIT_URL || "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
+const GEMINI_API_BASE = process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Sama dengan pilihan model di panel pengaturan chat (index.html)
 const ALLOWED_MODELS = new Set([
@@ -56,7 +60,7 @@ async function readJsonBody(req) {
 // Verifikasi Firebase ID token lewat Identity Toolkit (token ditolak jika palsu atau kedaluwarsa)
 async function isValidFirebaseUser(idToken) {
   const response = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_API_KEY)}`,
+    `${IDENTITY_TOOLKIT_URL}?key=${encodeURIComponent(FIREBASE_API_KEY)}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }
   );
   if (!response.ok) return false;
@@ -86,7 +90,7 @@ async function handleGemini(req, res, model) {
     }
   };
 
-  const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const upstream = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
     body: JSON.stringify(upstreamBody)
