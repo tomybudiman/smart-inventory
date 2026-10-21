@@ -405,7 +405,7 @@ async function createBarang(payload) {
 }
 
 // [UPDATE] Perbarui data barang
-async function updateBarang(key, payload) {
+export async function updateBarang(key, payload) {
   await update(ref(db, `inventaris/${key}`), payload);
 }
 
@@ -471,7 +471,7 @@ function openDeleteBarangModal(key, name) {
 }
 
 // [DELETE] Hapus barang beserta catatan peminjaman & perawatannya dalam satu multi-path update
-async function deleteBarang(key) {
+export async function deleteBarang(key) {
   await update(ref(db), buildHapusBarangUpdates(key, state.peminjamanData, state.perawatanData));
 }
 

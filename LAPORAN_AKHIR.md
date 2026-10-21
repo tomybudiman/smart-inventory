@@ -32,8 +32,10 @@
 4. **Verifikasi email** setelah register, ditegakkan di aplikasi, Security Rules, dan server proxy.
 5. **Deployment pindah dari Railway ke Google Cloud Run**, dengan server proxy agar Gemini API key tidak lagi tertanam di JavaScript browser.
 6. **Asisten AI membaca data peminjaman & perawatan**: dapat menjawab barang yang sedang dipinjam, unit tersedia, keterlambatan, dan riwayat perawatan.
-7. **Kode dipecah per fitur**: `index.html` kini hanya berisi markup; CSS ada di `src/styles/` dan JavaScript di modul ES `src/app/` (auth, inventaris, peminjaman, perawatan, asisten AI), digabungkan kembali oleh Vite saat build.
-8. **Security Rules dengan validasi skema** untuk ketiga node, dan **77 pengujian otomatis** (`npm test`).
+7. **Asisten AI dapat melakukan CRUD lewat kartu konfirmasi**: tambah/ubah/hapus barang dan catat/ubah/hapus peminjaman & perawatan, dengan validasi yang sama seperti form dan pemeriksaan ulang terhadap data terbaru tepat sebelum disimpan.
+8. **Asisten AI memakai fungsi baca** (`cariBarang`, `cariPeminjaman`, `cariPerawatan`, `rekapInventaris`): angka, rekap, dan filter dihitung oleh aplikasi pada data realtime lalu dikirim kembali ke Gemini, sehingga jawaban lebih akurat dan tetap ringkas saat data bertambah.
+9. **Kode dipecah per fitur**: `index.html` kini hanya berisi markup; CSS ada di `src/styles/` dan JavaScript di modul ES `src/app/` (auth, inventaris, peminjaman, perawatan, asisten AI), digabungkan kembali oleh Vite saat build.
+10. **Security Rules dengan validasi skema** untuk ketiga node, dan **104 pengujian otomatis** (`npm test`).
 
 ---
 
@@ -49,7 +51,7 @@
 | **Delete** | `deleteBarang()` · multi-path `update()` | `deletePeminjaman()` · `remove()` | `deletePerawatan()` · `remove()` |
 
 Operasi tambahan di luar 12 fungsi di atas:
-- **Create via Asisten AI**: barang yang diusulkan Gemini disimpan sekaligus dengan multi-path `update()` setelah petugas menekan *Simpan*.
+- **CRUD via Asisten AI**: Gemini dapat mengusulkan tambah, ubah, dan hapus barang serta catat, ubah, dan hapus peminjaman dan perawatan (*function calling*). Setiap usulan tampil sebagai kartu konfirmasi dan dijalankan dengan fungsi CRUD yang sama seperti tabel di atas; data baru berubah setelah petugas menekan tombol konfirmasi.
 - **Update cepat** `kembalikanPeminjaman()`: menandai peminjaman sebagai *Dikembalikan* langsung dari tabel.
 
 Fungsi CRUD berada di modul `src/app/inventaris.js`, `src/app/peminjaman.js`, dan `src/app/perawatan.js`; logika validasi murni dipisahkan ke `src/inventory-logic.mjs` agar dapat diuji.
@@ -92,12 +94,12 @@ async function createBarang(payload) {
 }
 
 // [UPDATE] Perbarui data barang
-async function updateBarang(key, payload) {
+export async function updateBarang(key, payload) {
   await update(ref(db, `inventaris/${key}`), payload);
 }
 
 // [DELETE] Hapus barang beserta catatan peminjaman & perawatannya dalam satu multi-path update
-async function deleteBarang(key) {
+export async function deleteBarang(key) {
   await update(ref(db), buildHapusBarangUpdates(key, state.peminjamanData, state.perawatanData));
 }
 ```
@@ -138,12 +140,12 @@ export function listenToPeminjamanChanges() {
 }
 
 // [CREATE] Catat peminjaman baru (push + set)
-async function createPeminjaman(payload) {
+export async function createPeminjaman(payload) {
   await set(push(peminjamanRef), payload);
 }
 
 // [UPDATE] Perbarui data peminjaman dari form edit
-async function updatePeminjaman(key, payload) {
+export async function updatePeminjaman(key, payload) {
   await update(ref(db, `peminjaman/${key}`), payload);
 }
 
@@ -156,7 +158,7 @@ async function kembalikanPeminjaman(key) {
 }
 
 // [DELETE] Hapus catatan peminjaman
-async function deletePeminjaman(key) {
+export async function deletePeminjaman(key) {
   await remove(ref(db, `peminjaman/${key}`));
 }
 ```
@@ -203,17 +205,17 @@ export function listenToPerawatanChanges() {
 }
 
 // [CREATE] Catat perawatan baru (push + set)
-async function createPerawatan(payload) {
+export async function createPerawatan(payload) {
   await set(push(perawatanRef), payload);
 }
 
 // [UPDATE] Perbarui data perawatan
-async function updatePerawatan(key, payload) {
+export async function updatePerawatan(key, payload) {
   await update(ref(db, `perawatan/${key}`), payload);
 }
 
 // [DELETE] Hapus catatan perawatan
-async function deletePerawatan(key) {
+export async function deletePerawatan(key) {
   await remove(ref(db, `perawatan/${key}`));
 }
 ```
@@ -496,7 +498,7 @@ if (!user.emailVerified) return sendError(res, 403, "Email belum diverifikasi. S
 | **Google Cloud Run** | Menjalankan `server.mjs` (Node.js 22) sebagai container: menyajikan aplikasi SPA dan menjadi proxy aman ke Gemini API. Region `asia-southeast2` (Jakarta), 1 vCPU, 512 MiB, maksimal 2 instance, akses publik lewat HTTPS. |
 | **Google Cloud Build** | Membangun image container dari `Dockerfile` (`node:22-alpine`) setiap kali `gcloud run deploy --source .` dijalankan. |
 | **Artifact Registry** | Menyimpan image container hasil build (repositori `cloud-run-source-deploy`, region `asia-southeast2`). |
-| **Google Gemini API** | Asisten AI inventaris (`gemini-3.8-flash` dengan fallback otomatis) yang membaca data inventaris, peminjaman, dan perawatan secara realtime, serta dapat mengusulkan barang baru. |
+| **Google Gemini API** | Asisten AI inventaris (`gemini-3.8-flash` dengan fallback otomatis) yang membaca data inventaris, peminjaman, dan perawatan secara realtime, menjawab pertanyaan berisi angka lewat fungsi baca yang dijalankan aplikasi, serta dapat mengusulkan tambah, ubah, dan hapus data (barang, peminjaman, perawatan) lewat kartu konfirmasi. |
 | **Cloud Logging** | Menampung log server Cloud Run untuk memantau error setelah deploy. |
 
 ### Arsitektur
@@ -538,19 +540,22 @@ npm run deploy:cloudrun
 - **Gemini API key hanya ada di server** (environment variable Cloud Run), tidak tertanam di JavaScript yang diunduh browser.
 - **Proxy Gemini** memverifikasi Firebase ID token lewat Identity Toolkit, menolak akun yang emailnya belum diverifikasi (403), hanya mengizinkan model dari daftar, membatasi panjang jawaban (2048 token) dan ukuran request (2 MB), serta hanya meneruskan field yang dipakai aplikasi.
 - **Security Rules** mewajibkan login dengan email terverifikasi dan memvalidasi setiap field.
+- **Aksi asisten AI tidak pernah langsung menulis data**: Gemini hanya mengusulkan; aplikasi memvalidasi usulan, menampilkannya sebagai kartu konfirmasi, memeriksanya ulang dengan data terbaru, lalu menyimpannya dengan akun petugas sehingga Security Rules tetap berlaku.
 - **Pencegahan XSS**: semua data dari database dan jawaban AI di-*escape* sebelum ditampilkan.
 
 ---
 
 ## 🧪 Pengujian
 
-`npm test` menjalankan **77 pengujian otomatis** (Node.js test runner, tanpa dependensi tambahan):
+`npm test` menjalankan **104 pengujian otomatis** (Node.js test runner, tanpa dependensi tambahan):
 
 - **`tests/inventory-logic.test.mjs`**: validasi usulan AI, validasi peminjaman & perawatan (stok tersedia, tanggal, biaya), status terlambat, hapus berantai, konteks AI (inventaris, peminjaman, perawatan), escape HTML, markdown, dan pesan error auth.
+- **`tests/ai-queries.test.mjs`**: fungsi baca asisten AI (filter, total unit & biaya, unit tersedia, hari keterlambatan, rekap per kategori/kondisi/lokasi) dan ringkasan data untuk Gemini saat data besar.
+- **`tests/ai-actions.test.mjs`**: penyusunan & validasi usulan aksi asisten AI (ubah/hapus barang, catat/ubah/hapus peminjaman & perawatan, ID tidak dikenal, stok, format tanggal).
 - **`tests/rules.test.mjs`**: kesesuaian `database.rules.json` dengan form (pilihan kategori/kondisi/status/jenis, field wajib, syarat email terverifikasi); markup form dibaca dari `index.html` dan payload dari modul `src/app/`.
 - **`tests/server.test.mjs`**: server proxy sebagai proses sungguhan dengan layanan Google tiruan (token tidak valid → 401, email belum diverifikasi → 403, pembatasan model, penyaringan field, path traversal).
 
-Selama pengembangan, Security Rules dan alur aplikasi juga diuji di **Firebase Emulator Suite** (Authentication + Realtime Database) dengan skenario end-to-end di Chrome: register → email verifikasi → dashboard, CRUD di ketiga modul, validasi stok, status terlambat, hapus berantai, serta tampilan ponsel. Skrip uji emulator ini dijalankan terpisah dan tidak disertakan di repositori.
+Selama pengembangan, Security Rules dan alur aplikasi juga diuji di **Firebase Emulator Suite** (Authentication + Realtime Database) dengan skenario end-to-end di Chrome: register → email verifikasi → dashboard, CRUD di ketiga modul, validasi stok, status terlambat, hapus berantai, CRUD lewat kartu konfirmasi asisten AI, fungsi baca bertahap (model meminta data → aplikasi menjawab → model menjawab petugas, dibatasi 5 langkah) dengan respons Gemini disimulasikan, serta tampilan ponsel. Skrip uji emulator ini dijalankan terpisah dan tidak disertakan di repositori.
 
 Pengiriman email verifikasi juga sudah dicoba langsung di aplikasi produksi: email diterima, tautan verifikasi berfungsi, dan akun dapat masuk ke dashboard setelahnya.
 
@@ -560,11 +565,11 @@ Pengiriman email verifikasi juga sudah dicoba langsung di aplikasi produksi: ema
 
 - **Branch Utama**: `master`
 - **Komit Terakhir**:
+  - `af8dbe5 feat: Implement Firebase authentication for user login, registration, email verification, and logout; add AI-powered "Gemini Chat" widget.`
   - `339e5fc feat: Enhance AI assistant to summarize real-time loan and maintenance data, update logic, UI prompts, tests, and documentation`
   - `958e3aa chore: Add final project report and update environment configuration guidelines for local and cloud deployment`
   - `31358ee feat: Enforce email verification for user access, update Firebase rules, add email verification flow, UI components, and tests`
-  - `d21f248 feat: Add "Peminjaman" and "Perawatan" modules with advanced logic, Firebase rules, validations, and tests`
-- **Cloud Run**: service `smart-inventory`, region `asia-southeast2`, revisi aktif `smart-inventory-00005-lpb` (100% traffic)
+- **Cloud Run**: service `smart-inventory`, region `asia-southeast2`, revisi aktif `smart-inventory-00006-vrp` (100% traffic)
 - **Environment Variables (Kredensial Disamarkan untuk Keamanan)**:
   - Server Cloud Run: `GEMINI_API_KEY`: `AIzaSy***********************************`, `FIREBASE_API_KEY`: `AIzaSy***********************************`
   - Build (`.env.local`): `VITE_FIREBASE_API_KEY`: `AIzaSy***********************************`, `VITE_FIREBASE_PROJECT_ID`: `alpha-bravo-*****`, `VITE_FIREBASE_DATABASE_URL`: `https://alpha-bravo-*****-default-rtdb.asia-southeast1.firebasedatabase.app`, `VITE_GEMINI_MODEL`: `gemini-3.8-flash`

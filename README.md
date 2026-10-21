@@ -143,8 +143,10 @@ VITE_GEMINI_MODEL=gemini-3.8-flash
 Aplikasi telah dilengkapi widget chat asisten cerdas ditenagai **Google Gemini AI** model terbaru (**`gemini-3.8-flash`** dengan auto-fallback ke `gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.0-flash`, dan `gemini-1.5-flash`):
 
 - **Koneksi Realtime Otomatis**: Asisten AI membaca seluruh data inventaris yang aktif secara otomatis (jumlah unit, nama barang, kategori, kondisi baik/rusak, dan sebaran lokasi ruangan), termasuk data peminjaman (peminjam, unit tersedia, batas kembali, keterlambatan) dan riwayat perawatan.
+- **Fungsi Baca untuk Jawaban Akurat**: untuk pertanyaan berisi angka, rekap, atau filter (misalnya *"Berapa unit laptop yang tersedia?"*, *"Siapa yang terlambat mengembalikan barang?"*, *"Total biaya perawatan bulan ini?"*), asisten memanggil fungsi `cariBarang`, `cariPeminjaman`, `cariPerawatan`, atau `rekapInventaris`. Aplikasi menjalankannya pada data realtime yang sama dengan tabel dan mengirim hasilnya kembali ke Gemini, sehingga angka dihitung oleh kode, bukan ditebak model. Jika data sudah besar (lebih dari 60 catatan), instruksi untuk Gemini hanya memuat ringkasan dan seluruh detail diambil lewat fungsi baca.
 - **Rekomendasi Pintar**: Mampu memberikan analisis kondisi alat lab, rekomendasi jadwal servis berdasarkan riwayat perawatan, dan SOP perawatan berkala.
 - **Tambah Barang via Chat**: Ketik permintaan seperti *"Tambah 10 kursi lipat dan 2 proyektor Epson di Ruang Rapat"*. Asisten menampilkan kartu konfirmasi berisi draft barang (divalidasi dengan aturan yang sama seperti form, plus penanda *Lokasi baru*), dan barang baru tersimpan ke Realtime Database setelah petugas menekan **Simpan**.
+- **Ubah, Hapus, Peminjaman & Perawatan via Chat**: misalnya *"Rudi sudah mengembalikan proyektor"*, *"Laptop perlu ganti keyboard, biaya 250 ribu"*, atau *"Hapus catatan perawatan keyboard"*. Asisten menampilkan kartu konfirmasi (nilai lama → nilai baru untuk perubahan, peringatan merah untuk penghapusan). Data baru berubah setelah petugas menekan tombol konfirmasi, divalidasi dengan aturan yang sama seperti form, dan diperiksa ulang dengan data terbaru tepat sebelum disimpan.
 - **Dukungan Format Markdown**: Respon disajikan rapi dengan poin-poin, penekanan teks penting, dan tabel.
 - **Tombol Salin & Bersihkan**: Memudahkan menyalin jawaban atau mereset percakapan.
 - **Panel Pengaturan Fleksibel**: Pengguna dapat melihat status koneksi (proxy server Cloud Run atau API key lokal) dan memilih model Gemini via ikon ⚙️ Pengaturan di dalam widget chat.
@@ -204,7 +206,7 @@ Aplikasi dibangun menggunakan Vite untuk performa cepat dan kemudahan deployment
    ```bash
    npm test
    ```
-   Pengujian mencakup logika murni di `src/inventory-logic.mjs` (validasi usulan AI, validasi peminjaman & perawatan, status terlambat, hapus berantai, konteks AI untuk inventaris, peminjaman & perawatan, escape HTML, markdown, pesan error auth), server proxy `server.mjs` (verifikasi token, penolakan akun yang emailnya belum diverifikasi, pembatasan model, penyaringan field, path traversal), dan kesesuaian `database.rules.json` dengan form pada `index.html` untuk ketiga node.
+   Pengujian mencakup fungsi baca asisten AI di `src/ai-queries.mjs` (filter, total, rekap, keterlambatan, ringkasan data besar), usulan aksi asisten AI di `src/ai-actions.mjs` (validasi setiap aksi, ID tidak dikenal, stok, format tanggal), logika murni di `src/inventory-logic.mjs` (validasi usulan AI, validasi peminjaman & perawatan, status terlambat, hapus berantai, konteks AI untuk inventaris, peminjaman & perawatan, escape HTML, markdown, pesan error auth), server proxy `server.mjs` (verifikasi token, penolakan akun yang emailnya belum diverifikasi, pembatasan model, penyaringan field, path traversal), dan kesesuaian `database.rules.json` dengan form pada `index.html` untuk ketiga node.
 
 ---
 
@@ -221,6 +223,8 @@ Aplikasi dibangun menggunakan Vite untuk performa cepat dan kemudahan deployment
 | `src/app/gemini-chat.js` | Widget asisten AI Gemini (konteks data realtime, usulan tambah barang) |
 | `src/app/ui.js` | Helper tampilan bersama: toast, format tanggal/Rupiah, badge, modal konfirmasi hapus |
 | `src/inventory-logic.mjs` | Logika murni tanpa DOM/Firebase (validasi, perhitungan stok, konteks AI) agar dapat diuji |
+| `src/ai-actions.mjs` | Logika murni untuk menyusun & memvalidasi usulan aksi asisten AI (kartu konfirmasi) |
+| `src/ai-queries.mjs` | Fungsi baca asisten AI (cari barang/peminjaman/perawatan, rekap) dan ringkasan data untuk Gemini |
 | `server.mjs` | Server produksi Cloud Run: menyajikan `dist/` dan proxy Gemini (cek ID token & email terverifikasi) |
 | `database.rules.json`, `firebase.json` | Security Rules Realtime Database dan konfigurasi deploy-nya |
 | `Dockerfile`, `.gcloudignore` | Image container Cloud Run dan daftar berkas yang diunggah ke Cloud Build |

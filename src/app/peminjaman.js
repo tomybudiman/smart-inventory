@@ -67,12 +67,12 @@ export function listenToPeminjamanChanges() {
 }
 
 // [CREATE] Catat peminjaman baru (push + set)
-async function createPeminjaman(payload) {
+export async function createPeminjaman(payload) {
   await set(push(peminjamanRef), payload);
 }
 
 // [UPDATE] Perbarui data peminjaman dari form edit
-async function updatePeminjaman(key, payload) {
+export async function updatePeminjaman(key, payload) {
   await update(ref(db, `peminjaman/${key}`), payload);
 }
 
@@ -85,7 +85,7 @@ async function kembalikanPeminjaman(key) {
 }
 
 // [DELETE] Hapus catatan peminjaman
-async function deletePeminjaman(key) {
+export async function deletePeminjaman(key) {
   await remove(ref(db, `peminjaman/${key}`));
 }
 

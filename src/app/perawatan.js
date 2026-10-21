@@ -65,17 +65,17 @@ export function listenToPerawatanChanges() {
 }
 
 // [CREATE] Catat perawatan baru (push + set)
-async function createPerawatan(payload) {
+export async function createPerawatan(payload) {
   await set(push(perawatanRef), payload);
 }
 
 // [UPDATE] Perbarui data perawatan
-async function updatePerawatan(key, payload) {
+export async function updatePerawatan(key, payload) {
   await update(ref(db, `perawatan/${key}`), payload);
 }
 
 // [DELETE] Hapus catatan perawatan
-async function deletePerawatan(key) {
+export async function deletePerawatan(key) {
   await remove(ref(db, `perawatan/${key}`));
 }
 
