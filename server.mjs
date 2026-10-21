@@ -1,7 +1,7 @@
 // Server produksi untuk Cloud Run.
 // - Menyajikan hasil build (dist/) dari `npm run build:cloudrun`.
-// - Meneruskan request Gemini dari petugas yang sudah login, sehingga
-//   GEMINI_API_KEY hanya ada di server dan tidak pernah sampai ke browser.
+// - Meneruskan request Gemini dari petugas yang sudah login dan emailnya terverifikasi,
+//   sehingga GEMINI_API_KEY hanya ada di server dan tidak pernah sampai ke browser.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";

@@ -1,7 +1,7 @@
 # 📋 LAPORAN AKHIR PROYEK
 ## Sistem Inventaris Barang Laboratorium & Kantor (SPA)
 
-- **Mata Kuliah / Proyek**: Tugas Proyek Pengembangan Aplikasi Web
+- **Mata Kuliah / Proyek**: Cloud Computing
 - **Status**: Seluruh requirement wajib terpenuhi dan sudah berjalan di produksi, ditambah layanan cloud di luar Firebase
 - **Teknologi**: HTML5, Bootstrap 5.3, Firebase Modular SDK v10 (Authentication & Realtime Database), Vite 5, Node.js 22, Google Cloud Run, Google Gemini API
 - **Aplikasi (Live)**: [https://smart-inventory-rxwyj62gha-et.a.run.app](https://smart-inventory-rxwyj62gha-et.a.run.app)
@@ -31,7 +31,8 @@
 3. **Hapus berantai**: menghapus barang ikut menghapus catatan peminjaman & perawatannya dalam satu operasi atomik.
 4. **Verifikasi email** setelah register, ditegakkan di aplikasi, Security Rules, dan server proxy.
 5. **Deployment pindah dari Railway ke Google Cloud Run**, dengan server proxy agar Gemini API key tidak lagi tertanam di JavaScript browser.
-6. **Security Rules dengan validasi skema** untuk ketiga node, dan **71 pengujian otomatis** (`npm test`).
+6. **Asisten AI membaca data peminjaman & perawatan**: dapat menjawab barang yang sedang dipinjam, unit tersedia, keterlambatan, dan riwayat perawatan.
+7. **Security Rules dengan validasi skema** untuk ketiga node, dan **77 pengujian otomatis** (`npm test`).
 
 ---
 
@@ -494,7 +495,7 @@ if (!user.emailVerified) return sendError(res, 403, "Email belum diverifikasi. S
 | **Google Cloud Run** | Menjalankan `server.mjs` (Node.js 22) sebagai container: menyajikan aplikasi SPA dan menjadi proxy aman ke Gemini API. Region `asia-southeast2` (Jakarta), 1 vCPU, 512 MiB, maksimal 2 instance, akses publik lewat HTTPS. |
 | **Google Cloud Build** | Membangun image container dari `Dockerfile` (`node:22-alpine`) setiap kali `gcloud run deploy --source .` dijalankan. |
 | **Artifact Registry** | Menyimpan image container hasil build (repositori `cloud-run-source-deploy`, region `asia-southeast2`). |
-| **Google Gemini API** | Asisten AI inventaris (`gemini-3.8-flash` dengan fallback otomatis) yang membaca data inventaris realtime dan dapat mengusulkan barang baru. |
+| **Google Gemini API** | Asisten AI inventaris (`gemini-3.8-flash` dengan fallback otomatis) yang membaca data inventaris, peminjaman, dan perawatan secara realtime, serta dapat mengusulkan barang baru. |
 | **Cloud Logging** | Menampung log server Cloud Run untuk memantau error setelah deploy. |
 
 ### Arsitektur
@@ -542,9 +543,9 @@ npm run deploy:cloudrun
 
 ## 🧪 Pengujian
 
-`npm test` menjalankan **71 pengujian otomatis** (Node.js test runner, tanpa dependensi tambahan):
+`npm test` menjalankan **77 pengujian otomatis** (Node.js test runner, tanpa dependensi tambahan):
 
-- **`tests/inventory-logic.test.mjs`**: validasi usulan AI, validasi peminjaman & perawatan (stok tersedia, tanggal, biaya), status terlambat, hapus berantai, konteks AI, escape HTML, markdown, dan pesan error auth.
+- **`tests/inventory-logic.test.mjs`**: validasi usulan AI, validasi peminjaman & perawatan (stok tersedia, tanggal, biaya), status terlambat, hapus berantai, konteks AI (inventaris, peminjaman, perawatan), escape HTML, markdown, dan pesan error auth.
 - **`tests/rules.test.mjs`**: kesesuaian `database.rules.json` dengan form di `index.html` (pilihan kategori/kondisi/status/jenis, field wajib, syarat email terverifikasi).
 - **`tests/server.test.mjs`**: server proxy sebagai proses sungguhan dengan layanan Google tiruan (token tidak valid → 401, email belum diverifikasi → 403, pembatasan model, penyaringan field, path traversal).
 
@@ -569,4 +570,4 @@ Pengiriman email verifikasi juga sudah dicoba langsung di aplikasi produksi: ema
   - Build (`.env.cloudrun`): `VITE_GEMINI_API_KEY`: *(sengaja dikosongkan)*, `VITE_GEMINI_PROXY_URL`: `/api/gemini`
 
 ---
-*Laporan akhir Pengembangan Aplikasi Web Sistem Inventaris Lab & Kantor.*
+*Laporan akhir mata kuliah Cloud Computing: Sistem Inventaris Barang Lab & Kantor.*

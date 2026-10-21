@@ -6,6 +6,7 @@ import {
   findRecordKeysByBarang,
   formatMarkdown,
   getInventoryContextSummary,
+  getPeminjamanPerawatanContextSummary,
   hitungUnitDipinjam,
   isPeminjamanTerlambat,
   mapAuthErrorMessage,
@@ -286,5 +287,58 @@ describe("peminjaman & perawatan", () => {
       "Biaya harus bilangan bulat minimal 0."
     ]);
     assert.deepEqual(validatePerawatan({ ...valid, biaya: 1.5 }, inventory), ["Biaya harus bilangan bulat minimal 0."]);
+  });
+});
+
+describe("getPeminjamanPerawatanContextSummary", () => {
+  const inventory = {
+    b1: { namaBarang: "Proyektor", jumlah: 3 },
+    b2: { namaBarang: "Laptop", jumlah: 5 }
+  };
+  const peminjaman = {
+    p1: { barangId: "b1", peminjam: "Budi", jumlah: 2, tanggalPinjam: "2026-10-10", tanggalKembali: "2026-10-20", status: "Dipinjam" },
+    p2: { barangId: "b2", peminjam: "Sari", jumlah: 1, tanggalPinjam: "2026-10-21", tanggalKembali: "2026-10-28", status: "Dipinjam" },
+    p3: { barangId: "b1", peminjam: "Andi", jumlah: 1, tanggalPinjam: "2026-10-01", tanggalKembali: "2026-10-05", status: "Dikembalikan" }
+  };
+  const perawatan = {
+    r1: { barangId: "b1", jenis: "Perbaikan", tanggal: "2026-10-15", biaya: 150000, status: "Dijadwalkan", deskripsi: "Ganti lampu" },
+    r2: { barangId: "b2", jenis: "Servis Rutin", tanggal: "2026-10-18", biaya: 50000, status: "Selesai", deskripsi: "Bersihkan kipas" }
+  };
+  const summary = getPeminjamanPerawatanContextSummary(inventory, peminjaman, perawatan, "2026-10-22");
+
+  test("memuat tanggal hari ini sebagai acuan keterlambatan", () => {
+    assert.ok(summary.startsWith("Tanggal hari ini: 2026-10-22"));
+  });
+
+  test("ringkasan & unit tersedia per barang yang sedang dipinjam", () => {
+    assert.ok(summary.includes("- Sedang dipinjam: 2 catatan, terlambat dikembalikan: 1 catatan"));
+    assert.ok(summary.includes("- Unit tersedia Proyektor: 1 dari 3 unit (2 unit sedang dipinjam)"));
+    assert.ok(summary.includes("- Unit tersedia Laptop: 4 dari 5 unit (1 unit sedang dipinjam)"));
+  });
+
+  test("daftar peminjaman menandai yang terlambat, terbaru lebih dulu", () => {
+    assert.ok(summary.includes(
+      "- [ID: p1] Proyektor | Peminjam: Budi | 2 unit | Tgl pinjam: 2026-10-10 | Batas kembali: 2026-10-20 | Status: Dipinjam (TERLAMBAT)"
+    ));
+    assert.ok(summary.includes("Peminjam: Andi | 1 unit | Tgl pinjam: 2026-10-01 | Batas kembali: 2026-10-05 | Status: Dikembalikan"));
+    assert.ok(summary.indexOf("[ID: p2]") < summary.indexOf("[ID: p1]"));
+  });
+
+  test("ringkasan & daftar perawatan dengan biaya Rupiah", () => {
+    assert.ok(summary.includes("- Belum selesai: 1 catatan, selesai: 1 catatan, total biaya: Rp 200.000"));
+    assert.ok(summary.includes(
+      "- [ID: r1] Proyektor | Jenis: Perbaikan | Tanggal: 2026-10-15 | Biaya: Rp 150.000 | Status: Dijadwalkan | Deskripsi: Ganti lampu"
+    ));
+  });
+
+  test("data kosong atau tidak ada", () => {
+    const kosong = getPeminjamanPerawatanContextSummary({}, undefined, {}, "2026-10-22");
+    assert.ok(kosong.includes("- Belum ada catatan peminjaman."));
+    assert.ok(kosong.includes("- Belum ada catatan perawatan."));
+  });
+
+  test("barang yang sudah tidak ada ditandai, bukan crash", () => {
+    const out = getPeminjamanPerawatanContextSummary({}, { p: { barangId: "x", status: "Dipinjam", jumlah: 1 } }, {}, "2026-10-22");
+    assert.ok(out.includes("(barang tidak ditemukan)"));
   });
 });

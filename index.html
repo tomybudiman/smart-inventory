@@ -1499,7 +1499,7 @@
           <span>Asisten Inventaris</span>
         </div>
         <div>
-          Halo! Saya asisten pintar inventaris yang ditenagai oleh <strong>Google Gemini</strong>. Saya terhubung langsung dengan database inventaris Anda untuk menjawab pertanyaan stok, lokasi, maupun kondisi barang.
+          Halo! Saya asisten pintar inventaris yang ditenagai oleh <strong>Google Gemini</strong>. Saya terhubung langsung dengan database inventaris Anda untuk menjawab pertanyaan stok, lokasi, kondisi barang, peminjaman, maupun riwayat perawatan.
         </div>
         <div class="mt-2">
           Saya juga bisa <strong>menambahkan barang baru</strong>, misalnya: <em>"Tambah 5 laptop Asus kondisi baik di Lab Komputer 2"</em>. Barang tersimpan setelah Anda menekan <strong>Simpan</strong> pada kartu konfirmasi.
@@ -1513,6 +1513,9 @@
           </button>
           <button class="gemini-chip-btn" data-prompt="Sebutkan barang apa saja yang kondisinya rusak atau memerlukan perbaikan?">
             ⚠️ Barang Rusak
+          </button>
+          <button class="gemini-chip-btn" data-prompt="Barang apa saja yang sedang dipinjam, siapa peminjamnya, dan adakah yang terlambat dikembalikan?">
+            📋 Peminjaman Aktif
           </button>
           <button class="gemini-chip-btn" data-prompt="Rangkum sebaran lokasi barang per ruangan dan apa saja isinya?">
             📍 Sebaran Ruangan
@@ -1579,6 +1582,7 @@
       findRecordKeysByBarang,
       formatMarkdown,
       getInventoryContextSummary,
+      getPeminjamanPerawatanContextSummary,
       hitungUnitDipinjam,
       isPeminjamanTerlambat,
       mapAuthErrorMessage,
@@ -3394,13 +3398,14 @@
     // Panggil Endpoint Gemini API (dengan Auto-Fallback Model)
     async function requestGeminiAPI(conversationHistory, modelToUse, apiKey) {
       const inventoryContext = getInventoryContextSummary(inventoryData);
+      const transaksiContext = getPeminjamanPerawatanContextSummary(inventoryData, peminjamanData, perawatanData, toIsoDate(new Date()));
       const systemInstruction = {
         parts: [
           {
             text: `Anda adalah "Asisten AI Inventaris Cerdas" untuk Sistem Inventaris Barang Laboratorium & Kantor.
 Tugas utama Anda:
-1. Menjawab pertanyaan pengguna seputar ketersediaan stok, jumlah unit, sebaran lokasi ruangan, dan kondisi barang (Baik, Rusak Ringan, Rusak Berat) berdasarkan DATA INVENTARIS REALTIME di bawah.
-2. Memberikan rekomendasi jadwal pemeliharaan alat, SOP operasional laboratorium/kantor, serta usulan tindakan perbaikan untuk barang yang rusak.
+1. Menjawab pertanyaan pengguna seputar ketersediaan stok, jumlah unit, sebaran lokasi ruangan, dan kondisi barang (Baik, Rusak Ringan, Rusak Berat), serta peminjaman (peminjam, unit tersedia, batas kembali, keterlambatan) dan riwayat perawatan barang berdasarkan DATA REALTIME di bawah.
+2. Memberikan rekomendasi jadwal pemeliharaan alat dengan memperhatikan riwayat perawatan yang tercatat, SOP operasional laboratorium/kantor, serta usulan tindakan perbaikan untuk barang yang rusak.
 3. Membantu membuat rekap atau draft laporan inventaris yang rapi jika diminta oleh petugas.
 4. Gunakan Bahasa Indonesia yang ramah, profesional, ringkas, dan solutif.
 5. Format teks dengan rapi menggunakan Markdown (gunakan bullet points, bold untuk penekanan, atau tabel ringkas bila relevan).
@@ -3409,12 +3414,16 @@ Tugas utama Anda:
    - Jika jumlah tidak disebutkan, gunakan 1. Jika kondisi tidak disebutkan, gunakan "Baik".
    - Pilih kategori yang paling sesuai dari pilihan yang tersedia.
    - Jika lokasi yang disebut merujuk ke ruangan yang sudah ada di data, tulis nama lokasinya persis seperti di data.
-7. Anda tidak dapat mengubah atau menghapus data barang. Jika diminta, arahkan petugas memakai tombol Edit atau Hapus di tabel inventaris.
+7. Anda tidak dapat mengubah atau menghapus data barang, dan tidak dapat mencatat, mengubah, atau menghapus data peminjaman maupun perawatan. Jika diminta, arahkan petugas memakai tombol Edit atau Hapus di tabel inventaris, atau tab Peminjaman / Perawatan.
 8. Baris berawalan [SISTEM] di riwayat percakapan dibuat otomatis oleh aplikasi. Jangan menulis baris seperti itu sendiri.
 
 === DATA INVENTARIS REALTIME SAAT INI ===
 ${inventoryContext}
 =========================================
+
+=== DATA PEMINJAMAN & PERAWATAN REALTIME ===
+${transaksiContext}
+============================================
 
 Catatan penting:
 Jika pengguna bertanya tentang barang atau ruangan yang tidak tercantum dalam data di atas, jawab dengan ramah bahwa barang atau ruangan tersebut saat ini belum terdaftar di sistem inventaris.`

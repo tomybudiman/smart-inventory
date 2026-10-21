@@ -142,8 +142,8 @@ VITE_GEMINI_MODEL=gemini-3.8-flash
 
 Aplikasi telah dilengkapi widget chat asisten cerdas ditenagai **Google Gemini AI** model terbaru (**`gemini-3.8-flash`** dengan auto-fallback ke `gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.0-flash`, dan `gemini-1.5-flash`):
 
-- **Koneksi Realtime Otomatis**: Asisten AI membaca seluruh data inventaris yang aktif secara otomatis (jumlah unit, nama barang, kategori, kondisi baik/rusak, dan sebaran lokasi ruangan).
-- **Rekomendasi Pintar**: Mampu memberikan analisis kondisi alat lab, rekomendasi jadwal servis, dan SOP perawatan berkala.
+- **Koneksi Realtime Otomatis**: Asisten AI membaca seluruh data inventaris yang aktif secara otomatis (jumlah unit, nama barang, kategori, kondisi baik/rusak, dan sebaran lokasi ruangan), termasuk data peminjaman (peminjam, unit tersedia, batas kembali, keterlambatan) dan riwayat perawatan.
+- **Rekomendasi Pintar**: Mampu memberikan analisis kondisi alat lab, rekomendasi jadwal servis berdasarkan riwayat perawatan, dan SOP perawatan berkala.
 - **Tambah Barang via Chat**: Ketik permintaan seperti *"Tambah 10 kursi lipat dan 2 proyektor Epson di Ruang Rapat"*. Asisten menampilkan kartu konfirmasi berisi draft barang (divalidasi dengan aturan yang sama seperti form, plus penanda *Lokasi baru*), dan barang baru tersimpan ke Realtime Database setelah petugas menekan **Simpan**.
 - **Dukungan Format Markdown**: Respon disajikan rapi dengan poin-poin, penekanan teks penting, dan tabel.
 - **Tombol Salin & Bersihkan**: Memudahkan menyalin jawaban atau mereset percakapan.
@@ -204,7 +204,7 @@ Aplikasi dibangun menggunakan Vite untuk performa cepat dan kemudahan deployment
    ```bash
    npm test
    ```
-   Pengujian mencakup logika murni di `src/inventory-logic.mjs` (validasi usulan AI, validasi peminjaman & perawatan, status terlambat, hapus berantai, konteks AI, escape HTML, markdown, pesan error auth), server proxy `server.mjs` (verifikasi token, penolakan akun yang emailnya belum diverifikasi, pembatasan model, penyaringan field, path traversal), dan kesesuaian `database.rules.json` dengan form pada `index.html` untuk ketiga node.
+   Pengujian mencakup logika murni di `src/inventory-logic.mjs` (validasi usulan AI, validasi peminjaman & perawatan, status terlambat, hapus berantai, konteks AI untuk inventaris, peminjaman & perawatan, escape HTML, markdown, pesan error auth), server proxy `server.mjs` (verifikasi token, penolakan akun yang emailnya belum diverifikasi, pembatasan model, penyaringan field, path traversal), dan kesesuaian `database.rules.json` dengan form pada `index.html` untuk ketiga node.
 
 ---
 

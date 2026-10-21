@@ -222,6 +222,50 @@ export function validatePeminjaman(data, inventoryData, peminjamanData, editKey 
   return errors;
 }
 
+// Ringkasan data peminjaman & perawatan untuk konteks Gemini (today: YYYY-MM-DD)
+export function getPeminjamanPerawatanContextSummary(inventoryData, peminjamanData, perawatanData, today) {
+  const namaBarang = (id) => inventoryData?.[id]?.namaBarang || "(barang tidak ditemukan)";
+  const rupiah = (n) => `Rp ${(Number(n) || 0).toLocaleString("id-ID")}`;
+  const lines = [`Tanggal hari ini: ${today}`, "", "PEMINJAMAN BARANG:"];
+
+  const pinjam = peminjamanData || {};
+  const pinjamKeys = Object.keys(pinjam).sort((a, b) => (pinjam[b].tanggalPinjam || "").localeCompare(pinjam[a].tanggalPinjam || ""));
+  if (pinjamKeys.length === 0) {
+    lines.push("- Belum ada catatan peminjaman.");
+  } else {
+    const aktif = pinjamKeys.filter((k) => pinjam[k].status === "Dipinjam");
+    const terlambat = aktif.filter((k) => isPeminjamanTerlambat(pinjam[k], today));
+    lines.push(`- Sedang dipinjam: ${aktif.length} catatan, terlambat dikembalikan: ${terlambat.length} catatan`);
+    for (const id of new Set(aktif.map((k) => pinjam[k].barangId))) {
+      const total = parseInt(inventoryData?.[id]?.jumlah, 10) || 0;
+      const dipinjam = hitungUnitDipinjam(pinjam, id);
+      lines.push(`- Unit tersedia ${namaBarang(id)}: ${Math.max(total - dipinjam, 0)} dari ${total} unit (${dipinjam} unit sedang dipinjam)`);
+    }
+    for (const k of pinjamKeys) {
+      const p = pinjam[k];
+      const status = isPeminjamanTerlambat(p, today) ? "Dipinjam (TERLAMBAT)" : (p.status || "-");
+      lines.push(`- [ID: ${k}] ${namaBarang(p.barangId)} | Peminjam: ${p.peminjam || "-"} | ${parseInt(p.jumlah, 10) || 0} unit | Tgl pinjam: ${p.tanggalPinjam || "-"} | Batas kembali: ${p.tanggalKembali || "-"} | Status: ${status}`);
+    }
+  }
+
+  lines.push("", "PERAWATAN BARANG:");
+  const rawat = perawatanData || {};
+  const rawatKeys = Object.keys(rawat).sort((a, b) => (rawat[b].tanggal || "").localeCompare(rawat[a].tanggal || ""));
+  if (rawatKeys.length === 0) {
+    lines.push("- Belum ada catatan perawatan.");
+  } else {
+    const selesai = rawatKeys.filter((k) => rawat[k].status === "Selesai").length;
+    const totalBiaya = rawatKeys.reduce((sum, k) => sum + (Number(rawat[k].biaya) || 0), 0);
+    lines.push(`- Belum selesai: ${rawatKeys.length - selesai} catatan, selesai: ${selesai} catatan, total biaya: ${rupiah(totalBiaya)}`);
+    for (const k of rawatKeys) {
+      const r = rawat[k];
+      lines.push(`- [ID: ${k}] ${namaBarang(r.barangId)} | Jenis: ${r.jenis || "-"} | Tanggal: ${r.tanggal || "-"} | Biaya: ${rupiah(r.biaya)} | Status: ${r.status || "-"} | Deskripsi: ${r.deskripsi || "-"}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 // Validasi form perawatan yang tidak tertangani atribut HTML
 export function validatePerawatan(data, inventoryData) {
   const errors = [];
