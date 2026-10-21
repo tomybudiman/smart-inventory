@@ -212,7 +212,14 @@ Aplikasi dibangun menggunakan Vite untuk performa cepat dan kemudahan deployment
 
 | Berkas / Folder | Isi |
 |---|---|
-| `index.html` | Seluruh tampilan SPA dan logika aplikasi (auth, verifikasi email, CRUD tiga modul, asisten AI) |
+| `index.html` | Markup SPA: halaman login/verifikasi, dashboard tiga tab, modal, dan widget chat |
+| `src/styles/main.css`, `src/styles/chat.css` | Gaya tampilan umum dan gaya widget asisten AI |
+| `src/app/main.js` | Titik masuk aplikasi: memuat modul dan menghubungkan alur antar-modul |
+| `src/app/firebase.js`, `src/app/state.js` | Inisialisasi Firebase (dan fungsi SDK yang dipakai modul lain) serta data bersama antar-modul |
+| `src/app/auth.js` | Login, register, logout, dan verifikasi email |
+| `src/app/inventaris.js`, `src/app/peminjaman.js`, `src/app/perawatan.js` | CRUD Realtime Database dan tampilan tiap modul |
+| `src/app/gemini-chat.js` | Widget asisten AI Gemini (konteks data realtime, usulan tambah barang) |
+| `src/app/ui.js` | Helper tampilan bersama: toast, format tanggal/Rupiah, badge, modal konfirmasi hapus |
 | `src/inventory-logic.mjs` | Logika murni tanpa DOM/Firebase (validasi, perhitungan stok, konteks AI) agar dapat diuji |
 | `server.mjs` | Server produksi Cloud Run: menyajikan `dist/` dan proxy Gemini (cek ID token & email terverifikasi) |
 | `database.rules.json`, `firebase.json` | Security Rules Realtime Database dan konfigurasi deploy-nya |
@@ -221,4 +228,4 @@ Aplikasi dibangun menggunakan Vite untuk performa cepat dan kemudahan deployment
 | `tests/` | Pengujian otomatis (`npm test`) |
 | `LAPORAN_AKHIR.md` | Laporan akhir proyek; `LAPORAN_CHECKPOINT_3.md` adalah laporan progres sebelumnya |
 
-Alur singkatnya: browser memuat aplikasi dari Cloud Run, lalu terhubung **langsung** ke Firebase Authentication dan Realtime Database lewat Firebase SDK. Hanya permintaan ke asisten AI yang melewati `server.mjs`, yang meneruskannya ke Gemini API dengan API key milik server.
+Saat build, Vite menggabungkan modul `src/app/` dan berkas CSS menjadi satu berkas JavaScript dan satu berkas CSS di `dist/assets/`. Alur singkatnya: browser memuat aplikasi dari Cloud Run, lalu terhubung **langsung** ke Firebase Authentication dan Realtime Database lewat Firebase SDK. Hanya permintaan ke asisten AI yang melewati `server.mjs`, yang meneruskannya ke Gemini API dengan API key milik server.

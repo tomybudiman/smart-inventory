@@ -20,7 +20,7 @@ export function mapAuthErrorMessage(errorCode) {
     case "auth/network-request-failed":
       return "Gagal terhubung ke server. Periksa koneksi internet Anda.";
     case "auth/api-key-not-valid":
-      return "Firebase API Key belum dikonfigurasi dengan benar di file index.html.";
+      return "Firebase API Key belum dikonfigurasi dengan benar. Periksa VITE_FIREBASE_API_KEY di file .env.local.";
     default:
       return `Terjadi kesalahan autentikasi: ${errorCode}`;
   }

@@ -1,4 +1,4 @@
-// Menjaga agar database.rules.json tidak menyimpang dari form di index.html.
+// Menjaga agar database.rules.json tidak menyimpang dari form (markup di index.html, payload di src/app/).
 // Catatan: berkas ini memeriksa kesesuaian isi aturan, bukan menjalankan Firebase Rules engine.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
@@ -20,10 +20,11 @@ function selectOptions(id) {
   return [...m[1].matchAll(/<option value="([^"]*)"/g)].map((x) => x[1]).filter(Boolean);
 }
 
-// Nama field pada objek `const <name> = { ... };` yang disimpan form ke database
-function payloadKeys(name) {
-  const block = html.match(new RegExp(`const ${name} = \\{([\\s\\S]*?)\\};`));
-  assert.ok(block, `blok ${name} tidak ditemukan di index.html`);
+// Nama field pada objek `const <name> = { ... };` yang disimpan form modul src/app/<file> ke database
+function payloadKeys(file, name) {
+  const code = readFileSync(new URL(`src/app/${file}`, root), "utf8");
+  const block = code.match(new RegExp(`const ${name} = \\{([\\s\\S]*?)\\};`));
+  assert.ok(block, `blok ${name} tidak ditemukan di src/app/${file}`);
   return [...block[1].matchAll(/^\s+(\w+):/gm)].map((x) => x[1]);
 }
 
@@ -49,7 +50,7 @@ describe("database.rules.json", () => {
   });
 
   test("field wajib sama dengan payload yang disimpan form", () => {
-    const keys = payloadKeys("payload");
+    const keys = payloadKeys("inventaris.js", "payload");
     assert.deepEqual(sorted(requiredFields(item)), sorted(keys));
     assert.deepEqual(sorted(ruleFields(item)), sorted(keys));
   });
@@ -80,13 +81,13 @@ describe("database.rules.json: peminjaman & perawatan", () => {
   }
 
   test("peminjaman: field wajib sama dengan payload yang disimpan form", () => {
-    const keys = payloadKeys("peminjamanPayload");
+    const keys = payloadKeys("peminjaman.js", "peminjamanPayload");
     assert.deepEqual(sorted(requiredFields(pinjam)), sorted(keys));
     assert.deepEqual(sorted(ruleFields(pinjam)), sorted(keys));
   });
 
   test("perawatan: field wajib sama dengan payload yang disimpan form", () => {
-    const keys = payloadKeys("perawatanPayload");
+    const keys = payloadKeys("perawatan.js", "perawatanPayload");
     assert.deepEqual(sorted(requiredFields(rawat)), sorted(keys));
     assert.deepEqual(sorted(ruleFields(rawat)), sorted(keys));
   });

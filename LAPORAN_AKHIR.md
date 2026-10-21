@@ -32,7 +32,8 @@
 4. **Verifikasi email** setelah register, ditegakkan di aplikasi, Security Rules, dan server proxy.
 5. **Deployment pindah dari Railway ke Google Cloud Run**, dengan server proxy agar Gemini API key tidak lagi tertanam di JavaScript browser.
 6. **Asisten AI membaca data peminjaman & perawatan**: dapat menjawab barang yang sedang dipinjam, unit tersedia, keterlambatan, dan riwayat perawatan.
-7. **Security Rules dengan validasi skema** untuk ketiga node, dan **77 pengujian otomatis** (`npm test`).
+7. **Kode dipecah per fitur**: `index.html` kini hanya berisi markup; CSS ada di `src/styles/` dan JavaScript di modul ES `src/app/` (auth, inventaris, peminjaman, perawatan, asisten AI), digabungkan kembali oleh Vite saat build.
+8. **Security Rules dengan validasi skema** untuk ketiga node, dan **77 pengujian otomatis** (`npm test`).
 
 ---
 
@@ -51,7 +52,7 @@ Operasi tambahan di luar 12 fungsi di atas:
 - **Create via Asisten AI**: barang yang diusulkan Gemini disimpan sekaligus dengan multi-path `update()` setelah petugas menekan *Simpan*.
 - **Update cepat** `kembalikanPeminjaman()`: menandai peminjaman sebagai *Dikembalikan* langsung dari tabel.
 
-Semua fungsi berada di `index.html`; logika validasi murni dipisahkan ke `src/inventory-logic.mjs` agar dapat diuji.
+Fungsi CRUD berada di modul `src/app/inventaris.js`, `src/app/peminjaman.js`, dan `src/app/perawatan.js`; logika validasi murni dipisahkan ke `src/inventory-logic.mjs` agar dapat diuji.
 
 ### Skema Data
 
@@ -61,11 +62,11 @@ Semua fungsi berada di `index.html`; logika validasi murni dipisahkan ke `src/in
 | `/peminjaman/{id}` | `barangId` (key di `/inventaris`), `peminjam`, `jumlah` (≥ 1), `tanggalPinjam`, `tanggalKembali` (YYYY-MM-DD), `status` (Dipinjam / Dikembalikan), `createdBy`, `updatedAt` |
 | `/perawatan/{id}` | `barangId`, `jenis` (Servis Rutin / Perbaikan / Kalibrasi), `deskripsi`, `tanggal` (YYYY-MM-DD), `biaya` (Rupiah, ≥ 0), `status` (Dijadwalkan / Dalam Proses / Selesai), `createdBy`, `updatedAt` |
 
-### A. Modul Inventaris Barang
+### A. Modul Inventaris Barang (`src/app/inventaris.js`)
 
 ```javascript
 // [READ / SYNC] Realtime listener via onValue()
-function listenToInventoryChanges() {
+export function listenToInventoryChanges() {
   stopListeningToInventory();
   tableLoading.classList.remove("d-none");
   emptyState.classList.add("d-none");
@@ -73,15 +74,13 @@ function listenToInventoryChanges() {
   unsubscribeInventory = onValue(inventarisRef, (snapshot) => {
     tableLoading.classList.add("d-none");
     const val = snapshot.val();
-    inventoryData = val || {};
+    state.inventoryData = val || {};
     renderInventoryTable();
     // Nama & stok barang juga dipakai tab peminjaman dan perawatan
-    renderPeminjamanTable();
-    renderPerawatanTable();
-    refreshBarangOptions();
+    notifyDataChange();
   }, (error) => {
     tableLoading.classList.add("d-none");
-    if (!currentUser) return; // sesi sudah berakhir (mis. setelah logout): abaikan error permission
+    if (!state.currentUser) return; // sesi sudah berakhir (mis. setelah logout): abaikan error permission
     console.error("Database onValue error:", error);
     showToast("Gagal memuat data dari database. Periksa Realtime Database Security Rules!", false);
   });
@@ -99,7 +98,7 @@ async function updateBarang(key, payload) {
 
 // [DELETE] Hapus barang beserta catatan peminjaman & perawatannya dalam satu multi-path update
 async function deleteBarang(key) {
-  await update(ref(db), buildHapusBarangUpdates(key, peminjamanData, perawatanData));
+  await update(ref(db), buildHapusBarangUpdates(key, state.peminjamanData, state.perawatanData));
 }
 ```
 
@@ -116,23 +115,23 @@ export function buildHapusBarangUpdates(barangId, peminjamanData, perawatanData)
 }
 ```
 
-### B. Modul Peminjaman Barang
+### B. Modul Peminjaman Barang (`src/app/peminjaman.js`)
 
 ```javascript
 // [READ / SYNC] Realtime listener via onValue()
-function listenToPeminjamanChanges() {
+export function listenToPeminjamanChanges() {
   stopListeningToPeminjaman();
   peminjamanLoading.classList.remove("d-none");
   peminjamanEmptyState.classList.add("d-none");
 
   unsubscribePeminjaman = onValue(peminjamanRef, (snapshot) => {
     peminjamanLoading.classList.add("d-none");
-    peminjamanData = snapshot.val() || {};
+    state.peminjamanData = snapshot.val() || {};
     renderPeminjamanTable();
-    refreshBarangOptions(); // unit tersedia ikut berubah
+    refreshPeminjamanBarangOptions(); // unit tersedia ikut berubah
   }, (error) => {
     peminjamanLoading.classList.add("d-none");
-    if (!currentUser) return; // sesi sudah berakhir: abaikan error permission
+    if (!state.currentUser) return; // sesi sudah berakhir: abaikan error permission
     console.error("Database onValue error (peminjaman):", error);
     showToast("Gagal memuat data peminjaman. Periksa Realtime Database Security Rules!", false);
   });
@@ -182,22 +181,22 @@ export function validatePeminjaman(data, inventoryData, peminjamanData, editKey 
 }
 ```
 
-### C. Modul Perawatan Barang
+### C. Modul Perawatan Barang (`src/app/perawatan.js`)
 
 ```javascript
 // [READ / SYNC] Realtime listener via onValue()
-function listenToPerawatanChanges() {
+export function listenToPerawatanChanges() {
   stopListeningToPerawatan();
   perawatanLoading.classList.remove("d-none");
   perawatanEmptyState.classList.add("d-none");
 
   unsubscribePerawatan = onValue(perawatanRef, (snapshot) => {
     perawatanLoading.classList.add("d-none");
-    perawatanData = snapshot.val() || {};
+    state.perawatanData = snapshot.val() || {};
     renderPerawatanTable();
   }, (error) => {
     perawatanLoading.classList.add("d-none");
-    if (!currentUser) return; // sesi sudah berakhir: abaikan error permission
+    if (!state.currentUser) return; // sesi sudah berakhir: abaikan error permission
     console.error("Database onValue error (perawatan):", error);
     showToast("Gagal memuat data perawatan. Periksa Realtime Database Security Rules!", false);
   });
@@ -263,6 +262,8 @@ Setiap node hanya dapat dibaca/ditulis oleh pengguna yang login **dan** emailnya
 ---
 
 ## 2️⃣ Requirement 2: Register & Login (Firebase Authentication)
+
+Seluruh alur autentikasi berada di `src/app/auth.js`.
 
 ### A. Login Petugas (`signInWithEmailAndPassword`)
 
@@ -365,7 +366,7 @@ onAuthStateChanged(auth, (user) => {
 
   if (user && user.emailVerified) {
     // --- USER SUDAH LOGIN & EMAIL TERVERIFIKASI ---
-    currentUser = user;
+    state.currentUser = user;
     authView.classList.add("d-none");
     verifyView.classList.add("d-none");
     dashboardView.classList.remove("d-none");
@@ -373,15 +374,15 @@ onAuthStateChanged(auth, (user) => {
     navUserEmail.textContent = user.email;
 
     // Aktifkan Realtime Database Listener (inventaris, peminjaman, perawatan)
-    listenToAllChanges();
+    hooks.startSync();
   } else {
     // --- GUEST, atau LOGIN tetapi email belum diverifikasi (belum boleh mengakses data) ---
-    currentUser = null;
-    inventoryData = {};
-    peminjamanData = {};
-    perawatanData = {};
-    stopListeningToAll();
-    resetChat(); // riwayat chat AI tidak boleh terbawa ke akun lain
+    state.currentUser = null;
+    state.inventoryData = {};
+    state.peminjamanData = {};
+    state.perawatanData = {};
+    hooks.stopSync();
+    hooks.resetChat(); // riwayat chat AI tidak boleh terbawa ke akun lain
     dashboardView.classList.add("d-none");
     navUserSection.classList.add("d-none");
 
@@ -396,7 +397,7 @@ onAuthStateChanged(auth, (user) => {
     }
 
     if (!isFirebaseConfigured) {
-      showAuthAlert("Konfigurasi Firebase belum diisi. Buka index.html dan masukkan kredensial `firebaseConfig` Anda.");
+      showAuthAlert("Konfigurasi Firebase belum diisi. Isi VITE_FIREBASE_* di file .env.local sesuai .env.example.");
     }
   }
 });
@@ -546,7 +547,7 @@ npm run deploy:cloudrun
 `npm test` menjalankan **77 pengujian otomatis** (Node.js test runner, tanpa dependensi tambahan):
 
 - **`tests/inventory-logic.test.mjs`**: validasi usulan AI, validasi peminjaman & perawatan (stok tersedia, tanggal, biaya), status terlambat, hapus berantai, konteks AI (inventaris, peminjaman, perawatan), escape HTML, markdown, dan pesan error auth.
-- **`tests/rules.test.mjs`**: kesesuaian `database.rules.json` dengan form di `index.html` (pilihan kategori/kondisi/status/jenis, field wajib, syarat email terverifikasi).
+- **`tests/rules.test.mjs`**: kesesuaian `database.rules.json` dengan form (pilihan kategori/kondisi/status/jenis, field wajib, syarat email terverifikasi); markup form dibaca dari `index.html` dan payload dari modul `src/app/`.
 - **`tests/server.test.mjs`**: server proxy sebagai proses sungguhan dengan layanan Google tiruan (token tidak valid → 401, email belum diverifikasi → 403, pembatasan model, penyaringan field, path traversal).
 
 Selama pengembangan, Security Rules dan alur aplikasi juga diuji di **Firebase Emulator Suite** (Authentication + Realtime Database) dengan skenario end-to-end di Chrome: register → email verifikasi → dashboard, CRUD di ketiga modul, validasi stok, status terlambat, hapus berantai, serta tampilan ponsel. Skrip uji emulator ini dijalankan terpisah dan tidak disertakan di repositori.
@@ -559,11 +560,11 @@ Pengiriman email verifikasi juga sudah dicoba langsung di aplikasi produksi: ema
 
 - **Branch Utama**: `master`
 - **Komit Terakhir**:
+  - `339e5fc feat: Enhance AI assistant to summarize real-time loan and maintenance data, update logic, UI prompts, tests, and documentation`
+  - `958e3aa chore: Add final project report and update environment configuration guidelines for local and cloud deployment`
   - `31358ee feat: Enforce email verification for user access, update Firebase rules, add email verification flow, UI components, and tests`
   - `d21f248 feat: Add "Peminjaman" and "Perawatan" modules with advanced logic, Firebase rules, validations, and tests`
-  - `a1258eb feat: Add smart inventory logic, Firebase rules, and comprehensive tests for validation and server functionality`
-  - `75bfaa0 feat: add proxy server for secure AI integrations and configure Cloud Run deployment`
-- **Cloud Run**: service `smart-inventory`, region `asia-southeast2`, revisi aktif `smart-inventory-00004-grr` (100% traffic)
+- **Cloud Run**: service `smart-inventory`, region `asia-southeast2`, revisi aktif `smart-inventory-00005-lpb` (100% traffic)
 - **Environment Variables (Kredensial Disamarkan untuk Keamanan)**:
   - Server Cloud Run: `GEMINI_API_KEY`: `AIzaSy***********************************`, `FIREBASE_API_KEY`: `AIzaSy***********************************`
   - Build (`.env.local`): `VITE_FIREBASE_API_KEY`: `AIzaSy***********************************`, `VITE_FIREBASE_PROJECT_ID`: `alpha-bravo-*****`, `VITE_FIREBASE_DATABASE_URL`: `https://alpha-bravo-*****-default-rtdb.asia-southeast1.firebasedatabase.app`, `VITE_GEMINI_MODEL`: `gemini-3.8-flash`
