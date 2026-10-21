@@ -15,6 +15,7 @@ Gunakan kredensial akun demo berikut untuk masuk dan menguji seluruh fitur siste
 
 1. **Autentikasi Pengguna (Firebase Auth)**:
    - Form Login & Registrasi dengan validasi input (email & panjang password minimal 6 karakter).
+   - **Verifikasi email**: setelah register, Firebase mengirim email berisi tautan verifikasi (`sendEmailVerification()`, berbahasa Indonesia). Akun yang belum terverifikasi tertahan di halaman verifikasi (tombol cek status, kirim ulang dengan jeda 60 detik, dan pengecekan otomatis saat kembali ke tab) serta tidak dapat membaca/menulis data maupun memakai asisten AI.
    - Pengalihan tampilan instan (*reactive state management*) menggunakan `onAuthStateChanged()`.
    - Error handling ramah pengguna dalam Bahasa Indonesia (alert Bootstrap).
    - Logout session yang aman dengan `signOut()`.
@@ -61,6 +62,7 @@ Gunakan kredensial akun demo berikut untuk masuk dan menguji seluruh fitur siste
 2. Klik tombol **Get Started**.
 3. Di tab **Sign-in method**, pilih penyedia **Email/Password**.
 4. Aktifkan opsi **Email/Password** (opsi Email link tidak perlu dicentang), lalu klik **Save**.
+5. (Opsional) Di tab **Templates** > **Email address verification**, sesuaikan nama pengirim dan isi email verifikasi.
 
 ### 3. Buat & Aktifkan Firebase Realtime Database
 1. Di bilah menu sebelah kiri, masuk ke **Build** > **Realtime Database**.
@@ -68,22 +70,22 @@ Gunakan kredensial akun demo berikut untuk masuk dan menguji seluruh fitur siste
 3. Pilih mode awal **Start in locked mode** (atau test mode), lalu klik **Enable**.
 
 ### 4. Atur Security Rules Realtime Database
-Pilih tab **Rules** pada Realtime Database, lalu masukkan aturan berikut yang **mewajibkan user terautentikasi (`auth != null`)**:
+Pilih tab **Rules** pada Realtime Database, lalu masukkan aturan berikut yang **mewajibkan user login dengan email terverifikasi**:
 
 ```json
 {
   "rules": {
     "inventaris": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.email_verified == true",
+      ".write": "auth != null && auth.token.email_verified == true"
     },
     "peminjaman": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.email_verified == true",
+      ".write": "auth != null && auth.token.email_verified == true"
     },
     "perawatan": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.email_verified == true",
+      ".write": "auth != null && auth.token.email_verified == true"
     }
   }
 }
@@ -95,7 +97,9 @@ Klik tombol **Publish** untuk menerapkan aturan.
 - **Console:** salin isi `database.rules.json` ke tab **Rules**, uji di **Rules Playground**, lalu klik **Publish**.
 - **CLI:** `npx firebase-tools login`, lalu `npx firebase-tools deploy --only database --project <project-id>`.
 
-> Catatan: data lama yang memiliki field di luar skema tetap terbaca, tetapi penyimpanan ulang (edit) barang tersebut akan ditolak. Panjang teks tidak dibatasi. Jika daftar pilihan pada form (kategori, kondisi, status, jenis perawatan) diubah, ubah juga `database.rules.json` (`npm test` akan gagal jika keduanya tidak sama).
+> Catatan: akun yang emailnya belum diverifikasi tidak dapat membaca maupun menulis data. Saat memperbarui produksi, deploy aplikasi lebih dulu baru kemudian rules, agar pengguna yang belum terverifikasi sudah diarahkan ke halaman verifikasi sebelum aksesnya ditutup.
+>
+> Data lama yang memiliki field di luar skema tetap terbaca, tetapi penyimpanan ulang (edit) barang tersebut akan ditolak. Panjang teks tidak dibatasi. Jika daftar pilihan pada form (kategori, kondisi, status, jenis perawatan) diubah, ubah juga `database.rules.json` (`npm test` akan gagal jika keduanya tidak sama).
 
 ### 5. Atur Kredensial Firebase & Gemini AI (Environment Variables)
 

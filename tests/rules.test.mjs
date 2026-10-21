@@ -29,13 +29,15 @@ function payloadKeys(name) {
 
 const quoted = (rule) => [...rule.matchAll(/== '([^']+)'/g)].map((x) => x[1]);
 const sorted = (arr) => [...arr].sort();
+// Data hanya untuk pengguna login yang emailnya sudah diverifikasi
+const VERIFIED_ONLY = "auth != null && auth.token.email_verified == true";
 const requiredFields = (node) => [...node[".validate"].matchAll(/'(\w+)'/g)].map((x) => x[1]);
 const ruleFields = (node) => Object.keys(node).filter((k) => !k.startsWith(".") && !k.startsWith("$"));
 
 describe("database.rules.json", () => {
-  test("baca/tulis mewajibkan pengguna login", () => {
-    assert.equal(inventaris[".read"], "auth != null");
-    assert.equal(inventaris[".write"], "auth != null");
+  test("baca/tulis mewajibkan login dengan email terverifikasi", () => {
+    assert.equal(inventaris[".read"], VERIFIED_ONLY);
+    assert.equal(inventaris[".write"], VERIFIED_ONLY);
   });
 
   test("daftar kategori sama dengan form", () => {
@@ -71,9 +73,9 @@ describe("database.rules.json", () => {
 
 describe("database.rules.json: peminjaman & perawatan", () => {
   for (const [name, node] of [["peminjaman", peminjaman], ["perawatan", perawatan]]) {
-    test(`${name}: baca/tulis mewajibkan pengguna login`, () => {
-      assert.equal(node[".read"], "auth != null");
-      assert.equal(node[".write"], "auth != null");
+    test(`${name}: baca/tulis mewajibkan login dengan email terverifikasi`, () => {
+      assert.equal(node[".read"], VERIFIED_ONLY);
+      assert.equal(node[".write"], VERIFIED_ONLY);
     });
   }
 

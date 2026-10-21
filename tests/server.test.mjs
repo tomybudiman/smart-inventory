@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const SERVER_FILE = fileURLToPath(new URL("../server.mjs", import.meta.url));
 const VALID_TOKEN = "token-valid";
+const UNVERIFIED_TOKEN = "token-email-belum-verifikasi";
 const GEMINI_KEY = "gemini-test-key";
 const FIREBASE_KEY = "firebase-test-key";
 
@@ -75,7 +76,8 @@ describe("server.mjs", () => {
       res.setHeader("Content-Type", "application/json");
       if (url.pathname === "/identity") {
         calls.identity.push({ key: url.searchParams.get("key"), body });
-        if (body.idToken === VALID_TOKEN) return res.end(JSON.stringify({ users: [{ localId: "u1" }] }));
+        if (body.idToken === VALID_TOKEN) return res.end(JSON.stringify({ users: [{ localId: "u1", emailVerified: true }] }));
+        if (body.idToken === UNVERIFIED_TOKEN) return res.end(JSON.stringify({ users: [{ localId: "u2", emailVerified: false }] }));
         res.statusCode = 400;
         return res.end(JSON.stringify({ error: { message: "INVALID_ID_TOKEN" } }));
       }
@@ -137,6 +139,14 @@ describe("server.mjs", () => {
       const last = calls.identity.at(-1);
       assert.equal(last.key, FIREBASE_KEY);
       assert.equal(last.body.idToken, "token-palsu");
+    });
+
+    test("token valid tetapi email belum diverifikasi ditolak 403 dan tidak menghubungi Gemini", async () => {
+      const before = calls.gemini.length;
+      const res = await post("/api/gemini/gemini-2.5-flash", { token: UNVERIFIED_TOKEN, body: { contents: [] } });
+      assert.equal(res.status, 403);
+      assert.match((await res.json()).error.message, /Email belum diverifikasi/);
+      assert.equal(calls.gemini.length, before);
     });
 
     test("model di luar daftar izin ditolak 400", async () => {

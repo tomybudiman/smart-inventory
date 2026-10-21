@@ -616,6 +616,37 @@
     </section>
 
     <!-- ============================================== -->
+    <!-- VIEW 1B: VERIFIKASI EMAIL                      -->
+    <!-- ============================================== -->
+    <section id="verifyView" class="auth-wrapper d-none">
+      <div class="auth-card p-4 text-center">
+        <div class="d-inline-flex p-3 rounded-circle bg-warning-subtle text-warning-emphasis mb-3">
+          <i class="bi bi-envelope-check-fill fs-3"></i>
+        </div>
+        <h2 class="h5 fw-bold mb-2">Verifikasi Email Anda</h2>
+        <p class="text-muted small mb-1">Tautan verifikasi telah dikirim ke:</p>
+        <p class="fw-semibold mb-3 text-break" id="verifyEmailAddress">-</p>
+        <p class="text-muted small mb-4">
+          Buka email tersebut dan klik tautan verifikasi, lalu kembali ke halaman ini.
+          Jika tidak ada di kotak masuk, periksa folder <strong>Spam</strong>.
+        </p>
+
+        <div id="verifyAlert" class="alert d-none py-2 px-3 small text-start mb-3" role="alert"></div>
+
+        <button type="button" id="btnCheckVerified" class="btn btn-primary w-100 py-2 rounded-3 fw-semibold d-flex align-items-center justify-content-center gap-2 mb-2">
+          <i class="bi bi-arrow-repeat"></i>
+          <span>Saya Sudah Verifikasi</span>
+        </button>
+        <button type="button" id="btnResendVerification" class="btn btn-outline-secondary w-100 py-2 rounded-3 fw-semibold mb-3">
+          Kirim Ulang Email Verifikasi
+        </button>
+        <button type="button" id="btnVerifyLogout" class="btn btn-link btn-sm text-danger text-decoration-none">
+          <i class="bi bi-box-arrow-left me-1"></i>Keluar dan gunakan akun lain
+        </button>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
     <!-- VIEW 2: DASHBOARD & CRUD INVENTARIS            -->
     <!-- ============================================== -->
     <section id="dashboardView" class="container-fluid px-lg-4 py-4 d-none">
@@ -1524,9 +1555,11 @@
     import { 
       getAuth, 
       createUserWithEmailAndPassword, 
-      signInWithEmailAndPassword, 
-      signOut, 
-      onAuthStateChanged 
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged,
+      sendEmailVerification,
+      reload
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { 
       getDatabase, 
@@ -1582,6 +1615,7 @@
       }
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
+      auth.languageCode = "id"; // email verifikasi dikirim dalam Bahasa Indonesia
       db = getDatabase(app);
     } catch (err) {
       console.error("Gagal menginisialisasi Firebase:", err);
@@ -1598,6 +1632,7 @@
     let unsubscribeInventory = null; // fungsi pelepas listener onValue (null jika belum berlangganan)
     let unsubscribePeminjaman = null;
     let unsubscribePerawatan = null;
+    let resendCooldownTimer = null; // jeda tombol kirim ulang email verifikasi
 
     // Bootstrap Modal & Toast Instances
     const itemModalElement = document.getElementById("itemModal");
@@ -1621,6 +1656,14 @@
     const btnLogout = document.getElementById("btnLogout");
     const authAlert = document.getElementById("authAlert");
     const authAlertText = document.getElementById("authAlertText");
+
+    // Email Verification Elements
+    const verifyView = document.getElementById("verifyView");
+    const verifyEmailAddress = document.getElementById("verifyEmailAddress");
+    const verifyAlert = document.getElementById("verifyAlert");
+    const btnCheckVerified = document.getElementById("btnCheckVerified");
+    const btnResendVerification = document.getElementById("btnResendVerification");
+    const btnVerifyLogout = document.getElementById("btnVerifyLogout");
 
     // Dashboard & Table Elements
     const tableBody = document.getElementById("inventoryTableBody");
@@ -1757,6 +1800,12 @@
       authAlertText.textContent = "";
     }
 
+    // type: kelas warna alert Bootstrap (danger, warning, success); message kosong = sembunyikan
+    function showVerifyAlert(message, type = "danger") {
+      verifyAlert.className = `alert alert-${type} py-2 px-3 small text-start mb-3${message ? "" : " d-none"}`;
+      verifyAlert.textContent = message;
+    }
+
     function formatDate(isoString) {
       if (!isoString) return "-";
       try {
@@ -1831,10 +1880,11 @@
         initialLoading.style.opacity = "0";
         setTimeout(() => initialLoading.classList.add("d-none"), 250);
 
-        if (user) {
-          // --- USER SUDAH LOGIN ---
+        if (user && user.emailVerified) {
+          // --- USER SUDAH LOGIN & EMAIL TERVERIFIKASI ---
           currentUser = user;
           authView.classList.add("d-none");
+          verifyView.classList.add("d-none");
           dashboardView.classList.remove("d-none");
           navUserSection.classList.remove("d-none");
           navUserEmail.textContent = user.email;
@@ -1842,7 +1892,7 @@
           // Aktifkan Realtime Database Listener (inventaris, peminjaman, perawatan)
           listenToAllChanges();
         } else {
-          // --- USER BELUM LOGIN (GUEST) ---
+          // --- GUEST, atau LOGIN tetapi email belum diverifikasi (belum boleh mengakses data) ---
           currentUser = null;
           inventoryData = {};
           peminjamanData = {};
@@ -1851,7 +1901,16 @@
           resetChat(); // riwayat chat AI tidak boleh terbawa ke akun lain
           dashboardView.classList.add("d-none");
           navUserSection.classList.add("d-none");
-          authView.classList.remove("d-none");
+
+          if (user) {
+            authView.classList.add("d-none");
+            verifyView.classList.remove("d-none");
+            verifyEmailAddress.textContent = user.email;
+          } else {
+            verifyView.classList.add("d-none");
+            authView.classList.remove("d-none");
+            showVerifyAlert(""); // pesan verifikasi akun sebelumnya tidak boleh terbawa
+          }
 
           if (!isFirebaseConfigured) {
             showAuthAlert("Konfigurasi Firebase belum diisi. Buka index.html dan masukkan kredensial `firebaseConfig` Anda.");
@@ -1881,9 +1940,10 @@
       btnLoginSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Memproses...`;
 
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const { user } = await signInWithEmailAndPassword(auth, email, password);
         formLogin.reset();
-        showToast("Login berhasil! Selamat datang.");
+        // Akun yang belum terverifikasi diarahkan ke halaman verifikasi oleh onAuthStateChanged
+        if (user.emailVerified) showToast("Login berhasil! Selamat datang.");
       } catch (error) {
         console.error("Login Error:", error);
         showAuthAlert(mapAuthErrorMessage(error.code || error.message));
@@ -1921,9 +1981,18 @@
       btnRegisterSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Mendaftarkan...`;
 
       try {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const { user } = await createUserWithEmailAndPassword(auth, email, password);
         formRegister.reset();
-        showToast("Pendaftaran berhasil! Akun langsung aktif.");
+        try {
+          // Firebase mengirim email berisi tautan verifikasi ke alamat yang didaftarkan
+          await sendEmailVerification(user);
+          startResendCooldown();
+          showToast("Pendaftaran berhasil! Tautan verifikasi telah dikirim ke email Anda.");
+        } catch (error) {
+          // Akun sudah dibuat; email bisa dikirim ulang dari halaman verifikasi
+          console.error("Gagal mengirim email verifikasi:", error);
+          showVerifyAlert("Akun berhasil dibuat, tetapi email verifikasi gagal dikirim. Silakan klik Kirim Ulang.", "warning");
+        }
       } catch (error) {
         console.error("Register Error:", error);
         showAuthAlert(mapAuthErrorMessage(error.code || error.message));
@@ -1933,8 +2002,8 @@
       }
     });
 
-    // Handler Logout
-    btnLogout.addEventListener("click", async () => {
+    // Handler Logout (navbar dashboard & halaman verifikasi email)
+    async function handleLogout() {
       // Lepas listener sebelum sesi berakhir agar tidak memicu error permission setelah logout
       stopListeningToAll();
       try {
@@ -1945,6 +2014,78 @@
         showToast("Gagal melakukan proses logout.", false);
         // Logout gagal: pengguna masih login, aktifkan kembali sinkronisasi data
         if (currentUser) listenToAllChanges();
+      }
+    }
+
+    btnLogout.addEventListener("click", handleLogout);
+    btnVerifyLogout.addEventListener("click", handleLogout);
+
+    // -------------------------------------------------------------
+    // 5B. VERIFIKASI EMAIL (sendEmailVerification)
+    // -------------------------------------------------------------
+
+    // Cek ulang status verifikasi. Token diperbarui agar klaim email_verified yang dibaca
+    // Security Rules & proxy Gemini ikut berubah, lalu halaman dimuat ulang supaya koneksi
+    // Realtime Database dimulai dengan token baru tersebut.
+    async function checkEmailVerified({ silent = false } = {}) {
+      const user = auth.currentUser;
+      if (!user || user.emailVerified) return;
+
+      btnCheckVerified.disabled = true;
+      try {
+        await reload(user);
+        if (user.emailVerified) {
+          await user.getIdToken(true);
+          window.location.reload();
+          return;
+        }
+        if (!silent) showVerifyAlert("Email belum terverifikasi. Klik tautan di email Anda terlebih dahulu.", "warning");
+      } catch (error) {
+        console.error("Gagal memeriksa status verifikasi:", error);
+        if (!silent) showVerifyAlert(mapAuthErrorMessage(error.code || error.message));
+      } finally {
+        btnCheckVerified.disabled = false;
+      }
+    }
+
+    // Tombol kirim ulang dikunci sementara agar tidak terkena batas pengiriman Firebase
+    function startResendCooldown(seconds = 60) {
+      clearInterval(resendCooldownTimer);
+      let remaining = seconds;
+      const tick = () => {
+        btnResendVerification.disabled = remaining > 0;
+        btnResendVerification.textContent = remaining > 0
+          ? `Kirim Ulang Email Verifikasi (${remaining})`
+          : "Kirim Ulang Email Verifikasi";
+        if (remaining <= 0) clearInterval(resendCooldownTimer);
+        remaining--;
+      };
+      tick();
+      resendCooldownTimer = setInterval(tick, 1000);
+    }
+
+    btnCheckVerified.addEventListener("click", () => checkEmailVerified());
+
+    btnResendVerification.addEventListener("click", async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      btnResendVerification.disabled = true;
+      try {
+        await sendEmailVerification(user);
+        showVerifyAlert(`Email verifikasi telah dikirim ulang ke ${user.email}.`, "success");
+        startResendCooldown();
+      } catch (error) {
+        console.error("Gagal mengirim ulang email verifikasi:", error);
+        showVerifyAlert(mapAuthErrorMessage(error.code || error.message));
+        btnResendVerification.disabled = false;
+      }
+    });
+
+    // Saat pengguna kembali ke tab ini setelah mengklik tautan di email, cek otomatis
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && !verifyView.classList.contains("d-none")) {
+        checkEmailVerified({ silent: true });
       }
     });
 

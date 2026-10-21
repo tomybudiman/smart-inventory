@@ -57,24 +57,26 @@ async function readJsonBody(req) {
   }
 }
 
-// Verifikasi Firebase ID token lewat Identity Toolkit (token ditolak jika palsu atau kedaluwarsa)
-async function isValidFirebaseUser(idToken) {
+// Verifikasi Firebase ID token lewat Identity Toolkit (token ditolak jika palsu atau kedaluwarsa).
+// Mengembalikan data akun, atau null jika token tidak valid.
+async function lookupFirebaseUser(idToken) {
   const response = await fetch(
     `${IDENTITY_TOOLKIT_URL}?key=${encodeURIComponent(FIREBASE_API_KEY)}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }
   );
-  if (!response.ok) return false;
+  if (!response.ok) return null;
   const data = await response.json();
-  return Boolean(data.users?.length);
+  return data.users?.[0] || null;
 }
 
 async function handleGemini(req, res, model) {
   if (!ALLOWED_MODELS.has(model)) return sendError(res, 400, `Model ${model} tidak diizinkan.`);
 
   const idToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!idToken || !(await isValidFirebaseUser(idToken))) {
-    return sendError(res, 401, "Sesi login tidak valid. Silakan login ulang.");
-  }
+  const user = idToken ? await lookupFirebaseUser(idToken) : null;
+  if (!user) return sendError(res, 401, "Sesi login tidak valid. Silakan login ulang.");
+  // Sama dengan Security Rules: hanya akun yang emailnya sudah diverifikasi
+  if (!user.emailVerified) return sendError(res, 403, "Email belum diverifikasi. Silakan verifikasi email Anda terlebih dahulu.");
 
   const { body, error } = await readJsonBody(req);
   if (error) return sendError(res, ...error);

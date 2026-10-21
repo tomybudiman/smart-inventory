@@ -1,8 +1,8 @@
 {
   "rules": {
     "inventaris": {
-      ".read": "auth != null",
-      ".write": "auth != null",
+      ".read": "auth != null && auth.token.email_verified == true",
+      ".write": "auth != null && auth.token.email_verified == true",
       "$itemId": {
         ".validate": "newData.hasChildren(['namaBarang', 'kategori', 'jumlah', 'kondisi', 'lokasi', 'createdBy', 'updatedAt'])",
         "namaBarang": {
@@ -32,8 +32,8 @@
       }
     },
     "peminjaman": {
-      ".read": "auth != null",
-      ".write": "auth != null",
+      ".read": "auth != null && auth.token.email_verified == true",
+      ".write": "auth != null && auth.token.email_verified == true",
       "$peminjamanId": {
         ".validate": "newData.hasChildren(['barangId', 'peminjam', 'jumlah', 'tanggalPinjam', 'tanggalKembali', 'status', 'createdBy', 'updatedAt'])",
         "barangId": {
@@ -66,8 +66,8 @@
       }
     },
     "perawatan": {
-      ".read": "auth != null",
-      ".write": "auth != null",
+      ".read": "auth != null && auth.token.email_verified == true",
+      ".write": "auth != null && auth.token.email_verified == true",
       "$perawatanId": {
         ".validate": "newData.hasChildren(['barangId', 'jenis', 'deskripsi', 'tanggal', 'biaya', 'status', 'createdBy', 'updatedAt'])",
         "barangId": {
