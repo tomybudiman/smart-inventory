@@ -23,9 +23,13 @@ Gunakan kredensial akun demo berikut untuk masuk dan menguji seluruh fitur siste
    - **Create**: Tambah barang baru via modal interaktif (`push()` + `set()`).
    - **Read / Sync**: Sinkronisasi data realtime multi-user via `onValue()`.
    - **Update**: Edit rincian barang langsung dari modal (`update()`).
-   - **Delete**: Hapus barang dengan dialog konfirmasi aman (`remove()`).
+   - **Delete**: Hapus barang dengan dialog konfirmasi aman. Catatan peminjaman & perawatan barang tersebut ikut terhapus dalam satu multi-path `update()`.
 
-3. **Skema Data Node (`/inventaris`)**:
+3. **Peminjaman & Perawatan Barang (CRUD)** — tab terpisah di dashboard, masing-masing dengan Create (`push()` + `set()`), Read realtime (`onValue()`), Update (`update()`), dan Delete (`remove()`):
+   - **Peminjaman**: catat peminjam, jumlah unit, tanggal pinjam & batas kembali. Jumlah dibatasi unit yang masih tersedia, peminjaman yang lewat batas ditandai *Terlambat*, dan ada tombol cepat **Tandai Dikembalikan**.
+   - **Perawatan**: catat servis rutin, perbaikan, atau kalibrasi beserta tanggal, biaya, deskripsi, dan status (Dijadwalkan / Dalam Proses / Selesai).
+
+4. **Skema Data Node (`/inventaris`)**:
    - `namaBarang` (String)
    - `kategori` ("Elektronik", "ATK", "Perabot", "Hardware Jaringan")
    - `jumlah` (Number, minimal 1)
@@ -34,7 +38,11 @@ Gunakan kredensial akun demo berikut untuk masuk dan menguji seluruh fitur siste
    - `createdBy` (Email petugas)
    - `updatedAt` (ISO Timestamp)
 
-4. **Fitur Tambahan (UI/UX)**:
+   **Node `/peminjaman`**: `barangId` (key barang di `/inventaris`), `peminjam`, `jumlah` (minimal 1), `tanggalPinjam` & `tanggalKembali` (YYYY-MM-DD), `status` ("Dipinjam", "Dikembalikan"), `createdBy`, `updatedAt`.
+
+   **Node `/perawatan`**: `barangId`, `jenis` ("Servis Rutin", "Perbaikan", "Kalibrasi"), `deskripsi`, `tanggal` (YYYY-MM-DD), `biaya` (Rupiah, minimal 0), `status` ("Dijadwalkan", "Dalam Proses", "Selesai"), `createdBy`, `updatedAt`.
+
+5. **Fitur Tambahan (UI/UX)**:
    - Ringkasan statistik (KPI Cards): Total Item, Total Unit Fisik, Kondisi Baik, Perlu Perbaikan.
    - Live Search (pencarian nama & lokasi) dan Filter ganda berdasarkan Kategori & Kondisi.
    - Badge warna status kondisi barang (Hijau = Baik, Kuning = Rusak Ringan, Merah = Rusak Berat).
@@ -68,18 +76,26 @@ Pilih tab **Rules** pada Realtime Database, lalu masukkan aturan berikut yang **
     "inventaris": {
       ".read": "auth != null",
       ".write": "auth != null"
+    },
+    "peminjaman": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "perawatan": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }
 ```
 Klik tombol **Publish** untuk menerapkan aturan.
 
-**Aturan dengan validasi data (disarankan).** Repository ini menyertakan `database.rules.json`. Selain mewajibkan login, aturan tersebut memeriksa setiap barang di `/inventaris`: ketujuh field skema (`namaBarang`, `kategori`, `jumlah`, `kondisi`, `lokasi`, `createdBy`, `updatedAt`) wajib ada, `kategori` dan `kondisi` harus salah satu nilai pada form, `jumlah` harus bilangan bulat minimal 1, dan field di luar skema ditolak. Terapkan dengan salah satu cara berikut:
+**Aturan dengan validasi data (disarankan).** Repository ini menyertakan `database.rules.json`. Selain mewajibkan login, aturan tersebut memeriksa setiap barang di `/inventaris`: ketujuh field skema (`namaBarang`, `kategori`, `jumlah`, `kondisi`, `lokasi`, `createdBy`, `updatedAt`) wajib ada, `kategori` dan `kondisi` harus salah satu nilai pada form, `jumlah` harus bilangan bulat minimal 1, dan field di luar skema ditolak. Aturan serupa berlaku untuk `/peminjaman` dan `/perawatan`; selain itu `barangId` wajib merujuk ke barang yang ada di `/inventaris` dan tanggal wajib berformat YYYY-MM-DD. Terapkan dengan salah satu cara berikut:
 
 - **Console:** salin isi `database.rules.json` ke tab **Rules**, uji di **Rules Playground**, lalu klik **Publish**.
 - **CLI:** `npx firebase-tools login`, lalu `npx firebase-tools deploy --only database --project <project-id>`.
 
-> Catatan: data lama yang memiliki field di luar skema tetap terbaca, tetapi penyimpanan ulang (edit) barang tersebut akan ditolak. Panjang teks tidak dibatasi. Jika daftar kategori atau kondisi pada form diubah, ubah juga `database.rules.json` (`npm test` akan gagal jika keduanya tidak sama).
+> Catatan: data lama yang memiliki field di luar skema tetap terbaca, tetapi penyimpanan ulang (edit) barang tersebut akan ditolak. Panjang teks tidak dibatasi. Jika daftar pilihan pada form (kategori, kondisi, status, jenis perawatan) diubah, ubah juga `database.rules.json` (`npm test` akan gagal jika keduanya tidak sama).
 
 ### 5. Atur Kredensial Firebase & Gemini AI (Environment Variables)
 

@@ -30,6 +30,74 @@
           ".validate": false
         }
       }
+    },
+    "peminjaman": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$peminjamanId": {
+        ".validate": "newData.hasChildren(['barangId', 'peminjam', 'jumlah', 'tanggalPinjam', 'tanggalKembali', 'status', 'createdBy', 'updatedAt'])",
+        "barangId": {
+          ".validate": "newData.isString() && newData.val().length > 0 && !newData.val().contains('/') && root.child('inventaris/' + newData.val()).exists()"
+        },
+        "peminjam": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "jumlah": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 == 0"
+        },
+        "tanggalPinjam": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/)"
+        },
+        "tanggalKembali": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/)"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() == 'Dipinjam' || newData.val() == 'Dikembalikan')"
+        },
+        "createdBy": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "updatedAt": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "perawatan": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$perawatanId": {
+        ".validate": "newData.hasChildren(['barangId', 'jenis', 'deskripsi', 'tanggal', 'biaya', 'status', 'createdBy', 'updatedAt'])",
+        "barangId": {
+          ".validate": "newData.isString() && newData.val().length > 0 && !newData.val().contains('/') && root.child('inventaris/' + newData.val()).exists()"
+        },
+        "jenis": {
+          ".validate": "newData.isString() && (newData.val() == 'Servis Rutin' || newData.val() == 'Perbaikan' || newData.val() == 'Kalibrasi')"
+        },
+        "deskripsi": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "tanggal": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/)"
+        },
+        "biaya": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() % 1 == 0"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() == 'Dijadwalkan' || newData.val() == 'Dalam Proses' || newData.val() == 'Selesai')"
+        },
+        "createdBy": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "updatedAt": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }

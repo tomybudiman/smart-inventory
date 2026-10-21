@@ -1,10 +1,17 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildHapusBarangUpdates,
   escapeHtml,
+  findRecordKeysByBarang,
   formatMarkdown,
   getInventoryContextSummary,
+  hitungUnitDipinjam,
+  isPeminjamanTerlambat,
   mapAuthErrorMessage,
+  toIsoDate,
+  validatePeminjaman,
+  validatePerawatan,
   validateProposedItem
 } from "../src/inventory-logic.mjs";
 
@@ -176,5 +183,108 @@ describe("formatMarkdown", () => {
     const out = formatMarkdown("- satu\n- dua");
     assert.ok(out.includes("<ul"));
     assert.equal(out.match(/<li/g).length, 2);
+  });
+});
+
+describe("toIsoDate", () => {
+  test("memakai tanggal lokal dengan nol di depan", () => {
+    assert.equal(toIsoDate(new Date(2026, 0, 5)), "2026-01-05");
+    assert.equal(toIsoDate(new Date(2026, 11, 31, 23, 59)), "2026-12-31");
+  });
+});
+
+describe("peminjaman & perawatan", () => {
+  const inventory = {
+    b1: { namaBarang: "Proyektor", jumlah: 3 },
+    b2: { namaBarang: "Laptop", jumlah: "5" }
+  };
+  const peminjaman = {
+    p1: { barangId: "b1", jumlah: 2, status: "Dipinjam", tanggalKembali: "2026-10-20" },
+    p2: { barangId: "b1", jumlah: 1, status: "Dikembalikan", tanggalKembali: "2026-10-01" },
+    p3: { barangId: "b2", jumlah: "1", status: "Dipinjam", tanggalKembali: "2026-10-25" }
+  };
+  const perawatan = {
+    r1: { barangId: "b1" },
+    r2: { barangId: "b2" },
+    r3: { barangId: "b1" }
+  };
+
+  test("findRecordKeysByBarang mencari catatan per barang", () => {
+    assert.deepEqual(findRecordKeysByBarang(peminjaman, "b1"), ["p1", "p2"]);
+    assert.deepEqual(findRecordKeysByBarang(perawatan, "b1"), ["r1", "r3"]);
+    assert.deepEqual(findRecordKeysByBarang(undefined, "b1"), []);
+  });
+
+  test("buildHapusBarangUpdates menghapus barang beserta seluruh catatan terkait", () => {
+    assert.deepEqual(buildHapusBarangUpdates("b1", peminjaman, perawatan), {
+      "inventaris/b1": null,
+      "peminjaman/p1": null,
+      "peminjaman/p2": null,
+      "perawatan/r1": null,
+      "perawatan/r3": null
+    });
+    assert.deepEqual(buildHapusBarangUpdates("b9", peminjaman, perawatan), { "inventaris/b9": null });
+  });
+
+  test("hitungUnitDipinjam hanya menghitung yang masih dipinjam", () => {
+    assert.equal(hitungUnitDipinjam(peminjaman, "b1"), 2);
+    assert.equal(hitungUnitDipinjam(peminjaman, "b2"), 1);
+    assert.equal(hitungUnitDipinjam(peminjaman, "b1", "p1"), 0);
+    assert.equal(hitungUnitDipinjam({}, "b1"), 0);
+  });
+
+  test("isPeminjamanTerlambat", () => {
+    assert.equal(isPeminjamanTerlambat(peminjaman.p1, "2026-10-21"), true);
+    assert.equal(isPeminjamanTerlambat(peminjaman.p1, "2026-10-20"), false, "hari batas kembali belum terlambat");
+    assert.equal(isPeminjamanTerlambat(peminjaman.p2, "2026-10-21"), false, "sudah dikembalikan");
+    assert.equal(isPeminjamanTerlambat(undefined, "2026-10-21"), false);
+  });
+
+  const pinjamValid = {
+    barangId: "b1", peminjam: "Budi", jumlah: 1,
+    tanggalPinjam: "2026-10-21", tanggalKembali: "2026-10-28", status: "Dipinjam"
+  };
+
+  test("validatePeminjaman menerima data valid", () => {
+    assert.deepEqual(validatePeminjaman(pinjamValid, inventory, peminjaman), []);
+  });
+
+  test("validatePeminjaman menolak jumlah melebihi unit tersedia", () => {
+    assert.deepEqual(validatePeminjaman({ ...pinjamValid, jumlah: 2 }, inventory, peminjaman), [
+      "Jumlah melebihi unit yang tersedia (1 unit)."
+    ]);
+  });
+
+  test("validatePeminjaman: saat edit, unit catatan itu sendiri tidak dihitung", () => {
+    assert.deepEqual(validatePeminjaman({ ...pinjamValid, jumlah: 3 }, inventory, peminjaman, "p1"), []);
+  });
+
+  test("validatePeminjaman: status Dikembalikan tidak dibatasi stok", () => {
+    assert.deepEqual(validatePeminjaman({ ...pinjamValid, jumlah: 3, status: "Dikembalikan" }, inventory, peminjaman), []);
+  });
+
+  test("validatePeminjaman menolak barang tidak dikenal, peminjam kosong, dan tanggal terbalik", () => {
+    const errors = validatePeminjaman(
+      { ...pinjamValid, barangId: "x", peminjam: "", jumlah: 0, tanggalKembali: "2026-10-20" },
+      inventory,
+      peminjaman
+    );
+    assert.deepEqual(errors, [
+      "Barang tidak ditemukan di inventaris.",
+      "Nama peminjam wajib diisi.",
+      "Jumlah minimal 1 unit.",
+      "Batas kembali tidak boleh sebelum tanggal pinjam."
+    ]);
+  });
+
+  test("validatePerawatan", () => {
+    const valid = { barangId: "b2", deskripsi: "Ganti baterai", biaya: 0 };
+    assert.deepEqual(validatePerawatan(valid, inventory), []);
+    assert.deepEqual(validatePerawatan({ barangId: "x", deskripsi: "", biaya: -1 }, inventory), [
+      "Barang tidak ditemukan di inventaris.",
+      "Deskripsi perawatan wajib diisi.",
+      "Biaya harus bilangan bulat minimal 0."
+    ]);
+    assert.deepEqual(validatePerawatan({ ...valid, biaya: 1.5 }, inventory), ["Biaya harus bilangan bulat minimal 0."]);
   });
 });

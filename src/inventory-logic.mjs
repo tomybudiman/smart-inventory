@@ -164,3 +164,69 @@ export function validateProposedItem(raw, kategoriOptions, kondisiOptions) {
   if (!item.lokasi) errors.push("lokasi kosong");
   return { item, errors };
 }
+
+// -------------------------------------------------------------
+// Peminjaman & Perawatan (fungsi baru, bukan pindahan dari index.html)
+// -------------------------------------------------------------
+
+// Tanggal lokal dalam format YYYY-MM-DD, sama dengan nilai <input type="date">
+export function toIsoDate(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// Key catatan peminjaman/perawatan yang merujuk ke barang tertentu
+export function findRecordKeysByBarang(records, barangId) {
+  return Object.keys(records || {}).filter((key) => records[key]?.barangId === barangId);
+}
+
+// Path multi-path update untuk menghapus barang beserta seluruh catatan terkait.
+// Nilai null berarti hapus, sehingga semuanya terhapus sekaligus atau tidak sama sekali.
+export function buildHapusBarangUpdates(barangId, peminjamanData, perawatanData) {
+  const updates = { [`inventaris/${barangId}`]: null };
+  for (const key of findRecordKeysByBarang(peminjamanData, barangId)) updates[`peminjaman/${key}`] = null;
+  for (const key of findRecordKeysByBarang(perawatanData, barangId)) updates[`perawatan/${key}`] = null;
+  return updates;
+}
+
+// Total unit suatu barang yang masih berstatus "Dipinjam".
+// excludeKey: catatan yang sedang diedit, agar unitnya tidak terhitung dua kali.
+export function hitungUnitDipinjam(peminjamanData, barangId, excludeKey = null) {
+  let total = 0;
+  for (const [key, p] of Object.entries(peminjamanData || {})) {
+    if (key !== excludeKey && p?.barangId === barangId && p.status === "Dipinjam") {
+      total += parseInt(p.jumlah, 10) || 0;
+    }
+  }
+  return total;
+}
+
+// Terlambat = masih dipinjam dan batas kembalinya sudah lewat (today: YYYY-MM-DD)
+export function isPeminjamanTerlambat(peminjaman, today) {
+  return peminjaman?.status === "Dipinjam" && Boolean(peminjaman.tanggalKembali) && peminjaman.tanggalKembali < today;
+}
+
+// Validasi form peminjaman yang tidak tertangani atribut HTML (required, min).
+// Mengembalikan daftar pesan error; daftar kosong berarti valid.
+export function validatePeminjaman(data, inventoryData, peminjamanData, editKey = null) {
+  const errors = [];
+  const barang = inventoryData?.[data.barangId];
+  if (!barang) errors.push("Barang tidak ditemukan di inventaris.");
+  if (!data.peminjam) errors.push("Nama peminjam wajib diisi.");
+  if (!Number.isInteger(data.jumlah) || data.jumlah < 1) errors.push("Jumlah minimal 1 unit.");
+  if (data.tanggalKembali < data.tanggalPinjam) errors.push("Batas kembali tidak boleh sebelum tanggal pinjam.");
+  if (barang && data.status === "Dipinjam") {
+    const tersedia = (parseInt(barang.jumlah, 10) || 0) - hitungUnitDipinjam(peminjamanData, data.barangId, editKey);
+    if (data.jumlah > tersedia) errors.push(`Jumlah melebihi unit yang tersedia (${Math.max(tersedia, 0)} unit).`);
+  }
+  return errors;
+}
+
+// Validasi form perawatan yang tidak tertangani atribut HTML
+export function validatePerawatan(data, inventoryData) {
+  const errors = [];
+  if (!inventoryData?.[data.barangId]) errors.push("Barang tidak ditemukan di inventaris.");
+  if (!data.deskripsi) errors.push("Deskripsi perawatan wajib diisi.");
+  if (!Number.isInteger(data.biaya) || data.biaya < 0) errors.push("Biaya harus bilangan bulat minimal 0.");
+  return errors;
+}

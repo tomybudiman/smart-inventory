@@ -181,6 +181,28 @@
       font-size: 1.35rem;
     }
 
+    /* Navigasi Modul: Inventaris, Peminjaman, Perawatan */
+    .module-nav .nav-link {
+      color: #475569;
+      font-weight: 600;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.55rem 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .module-nav .nav-link:hover {
+      border-color: #cbd5e1;
+      color: var(--primary-color);
+    }
+
+    .module-nav .nav-link.active {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: #ffffff;
+    }
+
     /* Gemini AI Chat Widget Styles */
     .gemini-fab {
       position: fixed;
@@ -597,7 +619,32 @@
     <!-- VIEW 2: DASHBOARD & CRUD INVENTARIS            -->
     <!-- ============================================== -->
     <section id="dashboardView" class="container-fluid px-lg-4 py-4 d-none">
-      
+
+      <!-- Navigasi Modul -->
+      <ul class="nav nav-pills module-nav gap-2 mb-4" id="moduleTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active d-flex align-items-center gap-2" id="tab-inventaris" data-bs-toggle="pill" data-bs-target="#pane-inventaris" type="button" role="tab">
+            <i class="bi bi-box-seam"></i> Inventaris Barang
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link d-flex align-items-center gap-2" id="tab-peminjaman" data-bs-toggle="pill" data-bs-target="#pane-peminjaman" type="button" role="tab">
+            <i class="bi bi-box-arrow-up-right"></i> Peminjaman
+            <span class="badge rounded-pill bg-warning text-dark" id="badgePeminjamanAktif" title="Sedang dipinjam">0</span>
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link d-flex align-items-center gap-2" id="tab-perawatan" data-bs-toggle="pill" data-bs-target="#pane-perawatan" type="button" role="tab">
+            <i class="bi bi-tools"></i> Perawatan
+            <span class="badge rounded-pill bg-info text-dark" id="badgePerawatanAktif" title="Belum selesai">0</span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+      <!-- ============ TAB: INVENTARIS BARANG ============ -->
+      <div class="tab-pane fade show active" id="pane-inventaris" role="tabpanel" aria-labelledby="tab-inventaris">
+
       <!-- Welcome & Header Toolbar -->
       <div class="d-flex flex-column flex-md-row md-align-items-center justify-content-between gap-3 mb-4">
         <div>
@@ -764,6 +811,214 @@
         </div>
 
       </div>
+      </div>
+
+      <!-- ============ TAB: PEMINJAMAN BARANG ============ -->
+      <div class="tab-pane fade" id="pane-peminjaman" role="tabpanel" aria-labelledby="tab-peminjaman">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+          <div>
+            <h2 class="h4 fw-bold mb-1">Peminjaman Barang</h2>
+            <p class="text-muted small mb-0">Catat siapa yang meminjam barang, berapa unit, dan kapan harus dikembalikan.</p>
+          </div>
+          <button class="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 rounded-3 shadow-sm align-self-start align-self-md-center" id="btnOpenAddPeminjaman">
+            <i class="bi bi-plus-lg"></i>
+            <span class="fw-semibold">Catat Peminjaman</span>
+          </button>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-md-4">
+            <div class="stat-card p-3 d-flex align-items-center gap-3">
+              <div class="rounded-3 p-3 bg-warning-subtle text-warning-emphasis fs-4">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </div>
+              <div>
+                <div class="text-muted small fw-medium">Sedang Dipinjam</div>
+                <div class="fs-4 fw-bold" id="statPeminjamanAktif">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="stat-card p-3 d-flex align-items-center gap-3">
+              <div class="rounded-3 p-3 bg-danger-subtle text-danger fs-4">
+                <i class="bi bi-alarm"></i>
+              </div>
+              <div>
+                <div class="text-muted small fw-medium">Terlambat Kembali</div>
+                <div class="fs-4 fw-bold" id="statPeminjamanTerlambat">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="stat-card p-3 d-flex align-items-center gap-3">
+              <div class="rounded-3 p-3 bg-success-subtle text-success fs-4">
+                <i class="bi bi-box-arrow-in-down-left"></i>
+              </div>
+              <div>
+                <div class="text-muted small fw-medium">Sudah Dikembalikan</div>
+                <div class="fs-4 fw-bold" id="statPeminjamanSelesai">0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container p-3 p-md-4">
+          <div class="row g-2 align-items-center mb-3">
+            <div class="col-12 col-md-6">
+              <div class="input-group">
+                <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="searchPeminjaman" class="form-control border-start-0" placeholder="Cari nama barang atau peminjam..." />
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <select id="filterStatusPeminjaman" class="form-select">
+                <option value="">Semua Status</option>
+                <option value="Dipinjam">Dipinjam</option>
+                <option value="Terlambat">Terlambat</option>
+                <option value="Dikembalikan">Dikembalikan</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3 text-md-end text-muted small" id="peminjamanCountLabel">Memuat data...</div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col" style="width: 45px;" class="text-center">No</th>
+                  <th scope="col">Barang</th>
+                  <th scope="col">Peminjam</th>
+                  <th scope="col" class="text-center">Jumlah</th>
+                  <th scope="col">Tgl Pinjam</th>
+                  <th scope="col">Batas Kembali</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-end" style="min-width: 140px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="peminjamanTableBody">
+                <!-- Baris data dimuat secara dinamis via Realtime Database -->
+              </tbody>
+            </table>
+          </div>
+
+          <div id="peminjamanEmptyState" class="text-center py-5 d-none">
+            <div class="d-inline-flex p-4 rounded-circle bg-light text-secondary mb-3">
+              <i class="bi bi-journal-arrow-up fs-1"></i>
+            </div>
+            <h5 class="fw-bold mb-1">Belum Ada Peminjaman</h5>
+            <p class="text-muted small mb-0">Belum ada catatan peminjaman atau tidak ada data yang cocok dengan filter.</p>
+          </div>
+
+          <div id="peminjamanLoading" class="text-center py-5">
+            <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+            <span class="text-muted small">Menyinkronkan data peminjaman...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TAB: PERAWATAN BARANG ============ -->
+      <div class="tab-pane fade" id="pane-perawatan" role="tabpanel" aria-labelledby="tab-perawatan">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+          <div>
+            <h2 class="h4 fw-bold mb-1">Perawatan Barang</h2>
+            <p class="text-muted small mb-0">Jadwalkan dan catat riwayat servis, perbaikan, serta kalibrasi alat.</p>
+          </div>
+          <button class="btn btn-primary d-flex align-items-center gap-2 px-3 py-2 rounded-3 shadow-sm align-self-start align-self-md-center" id="btnOpenAddPerawatan">
+            <i class="bi bi-plus-lg"></i>
+            <span class="fw-semibold">Catat Perawatan</span>
+          </button>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-md-4">
+            <div class="stat-card p-3 d-flex align-items-center gap-3">
+              <div class="rounded-3 p-3 bg-info-subtle text-info-emphasis fs-4">
+                <i class="bi bi-hourglass-split"></i>
+              </div>
+              <div>
+                <div class="text-muted small fw-medium">Belum Selesai</div>
+                <div class="fs-4 fw-bold" id="statPerawatanAktif">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="stat-card p-3 d-flex align-items-center gap-3">
+              <div class="rounded-3 p-3 bg-success-subtle text-success fs-4">
+                <i class="bi bi-check2-all"></i>
+              </div>
+              <div>
+                <div class="text-muted small fw-medium">Selesai</div>
+                <div class="fs-4 fw-bold" id="statPerawatanSelesai">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="stat-card p-3 d-flex align-items-center gap-3">
+              <div class="rounded-3 p-3 bg-primary-subtle text-primary fs-4">
+                <i class="bi bi-cash-coin"></i>
+              </div>
+              <div>
+                <div class="text-muted small fw-medium">Total Biaya</div>
+                <div class="fs-4 fw-bold" id="statPerawatanBiaya">Rp 0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container p-3 p-md-4">
+          <div class="row g-2 align-items-center mb-3">
+            <div class="col-12 col-md-6">
+              <div class="input-group">
+                <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="searchPerawatan" class="form-control border-start-0" placeholder="Cari nama barang, jenis, atau deskripsi..." />
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <select id="filterStatusPerawatan" class="form-select">
+                <option value="">Semua Status</option>
+                <option value="Dijadwalkan">Dijadwalkan</option>
+                <option value="Dalam Proses">Dalam Proses</option>
+                <option value="Selesai">Selesai</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3 text-md-end text-muted small" id="perawatanCountLabel">Memuat data...</div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col" style="width: 45px;" class="text-center">No</th>
+                  <th scope="col">Barang</th>
+                  <th scope="col">Jenis</th>
+                  <th scope="col">Deskripsi</th>
+                  <th scope="col">Tanggal</th>
+                  <th scope="col" class="text-end">Biaya</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-end" style="min-width: 110px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="perawatanTableBody">
+                <!-- Baris data dimuat secara dinamis via Realtime Database -->
+              </tbody>
+            </table>
+          </div>
+
+          <div id="perawatanEmptyState" class="text-center py-5 d-none">
+            <div class="d-inline-flex p-4 rounded-circle bg-light text-secondary mb-3">
+              <i class="bi bi-wrench-adjustable fs-1"></i>
+            </div>
+            <h5 class="fw-bold mb-1">Belum Ada Perawatan</h5>
+            <p class="text-muted small mb-0">Belum ada catatan perawatan atau tidak ada data yang cocok dengan filter.</p>
+          </div>
+
+          <div id="perawatanLoading" class="text-center py-5">
+            <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+            <span class="text-muted small">Menyinkronkan data perawatan...</span>
+          </div>
+        </div>
+      </div>
+      </div>
     </section>
 
   </main>
@@ -862,7 +1117,7 @@
           <div class="text-danger mb-3">
             <i class="bi bi-trash3-fill display-5"></i>
           </div>
-          <h6 class="fw-bold mb-2">Hapus Barang Ini?</h6>
+          <h6 class="fw-bold mb-2" id="deleteModalTitle">Hapus Barang Ini?</h6>
           <p class="text-muted small mb-0" id="deleteItemNamePrompt">Data yang dihapus tidak dapat dipulihkan kembali dari sistem.</p>
         </div>
         <div class="d-flex justify-content-center gap-2 pb-2">
@@ -964,6 +1219,168 @@
             <span>Edit Barang Ini</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: CATAT / EDIT PEMINJAMAN (CRUD)          -->
+  <!-- ============================================== -->
+  <div class="modal fade" id="peminjamanModal" tabindex="-1" aria-labelledby="peminjamanModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg rounded-4">
+        <div class="modal-header border-bottom">
+          <h5 class="modal-title fw-bold" id="peminjamanModalLabel">
+            <i class="bi bi-box-arrow-up-right me-1 text-primary"></i>
+            <span id="peminjamanModalTitle">Catat Peminjaman Baru</span>
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="peminjamanForm" novalidate>
+          <div class="modal-body p-4">
+
+            <!-- Hidden key input untuk operasi Update -->
+            <input type="hidden" id="peminjamanId" value="" />
+
+            <div id="peminjamanFormAlert" class="alert alert-danger d-none py-2 px-3 small mb-3" role="alert"></div>
+
+            <div class="mb-3">
+              <label for="peminjamanBarang" class="form-label small fw-semibold">Barang <span class="text-danger">*</span></label>
+              <select class="form-select" id="peminjamanBarang" required>
+                <option value="" disabled selected>Pilih Barang</option>
+              </select>
+              <div class="invalid-feedback">Silakan pilih barang.</div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-8">
+                <label for="peminjamanPeminjam" class="form-label small fw-semibold">Nama Peminjam <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="peminjamanPeminjam" placeholder="Contoh: Budi Santoso (Mahasiswa TI)" required />
+                <div class="invalid-feedback">Nama peminjam wajib diisi.</div>
+              </div>
+              <div class="col-md-4">
+                <label for="peminjamanJumlah" class="form-label small fw-semibold">Jumlah (Unit) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="peminjamanJumlah" min="1" step="1" value="1" required />
+                <div class="invalid-feedback">Jumlah minimal 1 unit.</div>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label for="peminjamanTanggalPinjam" class="form-label small fw-semibold">Tanggal Pinjam <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="peminjamanTanggalPinjam" required />
+                <div class="invalid-feedback">Tanggal pinjam wajib diisi.</div>
+              </div>
+              <div class="col-md-6">
+                <label for="peminjamanTanggalKembali" class="form-label small fw-semibold">Batas Kembali <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="peminjamanTanggalKembali" required />
+                <div class="invalid-feedback">Batas kembali wajib diisi.</div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="peminjamanStatus" class="form-label small fw-semibold">Status <span class="text-danger">*</span></label>
+              <select class="form-select" id="peminjamanStatus" required>
+                <option value="Dipinjam">Dipinjam</option>
+                <option value="Dikembalikan">Dikembalikan</option>
+              </select>
+            </div>
+
+            <div class="bg-light p-3 rounded-3 small text-muted">
+              <i class="bi bi-info-circle me-1"></i> Jumlah yang dipinjam tidak boleh melebihi unit barang yang sedang tersedia.
+            </div>
+
+          </div>
+          <div class="modal-footer border-top px-4 py-3">
+            <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" id="btnSavePeminjaman" class="btn btn-primary rounded-3 px-4 fw-semibold d-flex align-items-center gap-2">
+              <span id="btnSavePeminjamanSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+              <span id="btnSavePeminjamanText">Simpan Data</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: CATAT / EDIT PERAWATAN (CRUD)           -->
+  <!-- ============================================== -->
+  <div class="modal fade" id="perawatanModal" tabindex="-1" aria-labelledby="perawatanModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg rounded-4">
+        <div class="modal-header border-bottom">
+          <h5 class="modal-title fw-bold" id="perawatanModalLabel">
+            <i class="bi bi-tools me-1 text-primary"></i>
+            <span id="perawatanModalTitle">Catat Perawatan Baru</span>
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="perawatanForm" novalidate>
+          <div class="modal-body p-4">
+
+            <!-- Hidden key input untuk operasi Update -->
+            <input type="hidden" id="perawatanId" value="" />
+
+            <div id="perawatanFormAlert" class="alert alert-danger d-none py-2 px-3 small mb-3" role="alert"></div>
+
+            <div class="mb-3">
+              <label for="perawatanBarang" class="form-label small fw-semibold">Barang <span class="text-danger">*</span></label>
+              <select class="form-select" id="perawatanBarang" required>
+                <option value="" disabled selected>Pilih Barang</option>
+              </select>
+              <div class="invalid-feedback">Silakan pilih barang.</div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label for="perawatanJenis" class="form-label small fw-semibold">Jenis Perawatan <span class="text-danger">*</span></label>
+                <select class="form-select" id="perawatanJenis" required>
+                  <option value="" disabled selected>Pilih Jenis</option>
+                  <option value="Servis Rutin">Servis Rutin</option>
+                  <option value="Perbaikan">Perbaikan</option>
+                  <option value="Kalibrasi">Kalibrasi</option>
+                </select>
+                <div class="invalid-feedback">Silakan pilih jenis perawatan.</div>
+              </div>
+              <div class="col-md-6">
+                <label for="perawatanTanggal" class="form-label small fw-semibold">Tanggal <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="perawatanTanggal" required />
+                <div class="invalid-feedback">Tanggal wajib diisi.</div>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label for="perawatanStatus" class="form-label small fw-semibold">Status <span class="text-danger">*</span></label>
+                <select class="form-select" id="perawatanStatus" required>
+                  <option value="Dijadwalkan">Dijadwalkan</option>
+                  <option value="Dalam Proses">Dalam Proses</option>
+                  <option value="Selesai">Selesai</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="perawatanBiaya" class="form-label small fw-semibold">Biaya (Rp) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="perawatanBiaya" min="0" step="1" value="0" required />
+                <div class="invalid-feedback">Biaya berupa bilangan bulat, minimal 0.</div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="perawatanDeskripsi" class="form-label small fw-semibold">Deskripsi Pekerjaan <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="perawatanDeskripsi" rows="3" placeholder="Contoh: Ganti lampu proyektor dan bersihkan filter udara" required></textarea>
+              <div class="invalid-feedback">Deskripsi wajib diisi.</div>
+            </div>
+
+          </div>
+          <div class="modal-footer border-top px-4 py-3">
+            <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" id="btnSavePerawatan" class="btn btn-primary rounded-3 px-4 fw-semibold d-flex align-items-center gap-2">
+              <span id="btnSavePerawatanSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+              <span id="btnSavePerawatanText">Simpan Data</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -1121,12 +1538,20 @@
       onValue 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    // Logika murni (validasi usulan AI, konteks AI, escape HTML, markdown, pesan error auth)
+    // Logika murni (validasi usulan AI, konteks AI, escape HTML, markdown, pesan error auth,
+    // serta validasi & perhitungan peminjaman/perawatan)
     import {
+      buildHapusBarangUpdates,
       escapeHtml,
+      findRecordKeysByBarang,
       formatMarkdown,
       getInventoryContextSummary,
+      hitungUnitDipinjam,
+      isPeminjamanTerlambat,
       mapAuthErrorMessage,
+      toIsoDate,
+      validatePeminjaman,
+      validatePerawatan,
       validateProposedItem
     } from "./src/inventory-logic.mjs";
 
@@ -1167,8 +1592,12 @@
     // -------------------------------------------------------------
     let currentUser = null;
     let inventoryData = {}; // Cache data dari Realtime Database { [key]: { ...data } }
-    let deleteTargetKey = null;
+    let peminjamanData = {}; // Cache node /peminjaman
+    let perawatanData = {}; // Cache node /perawatan
+    let pendingDelete = null; // { successMessage, run } untuk modal konfirmasi hapus
     let unsubscribeInventory = null; // fungsi pelepas listener onValue (null jika belum berlangganan)
+    let unsubscribePeminjaman = null;
+    let unsubscribePerawatan = null;
 
     // Bootstrap Modal & Toast Instances
     const itemModalElement = document.getElementById("itemModal");
@@ -1249,7 +1678,62 @@
     const btnOpenAddModal = document.getElementById("btnOpenAddModal");
     const btnConfirmDelete = document.getElementById("btnConfirmDelete");
     const btnDeleteSpinner = document.getElementById("btnDeleteSpinner");
+    const deleteModalTitle = document.getElementById("deleteModalTitle");
     const deleteItemNamePrompt = document.getElementById("deleteItemNamePrompt");
+
+    // Peminjaman Elements
+    const peminjamanModal = new bootstrap.Modal(document.getElementById("peminjamanModal"));
+    const peminjamanForm = document.getElementById("peminjamanForm");
+    const peminjamanIdInput = document.getElementById("peminjamanId");
+    const peminjamanBarangInput = document.getElementById("peminjamanBarang");
+    const peminjamanPeminjamInput = document.getElementById("peminjamanPeminjam");
+    const peminjamanJumlahInput = document.getElementById("peminjamanJumlah");
+    const peminjamanTanggalPinjamInput = document.getElementById("peminjamanTanggalPinjam");
+    const peminjamanTanggalKembaliInput = document.getElementById("peminjamanTanggalKembali");
+    const peminjamanStatusInput = document.getElementById("peminjamanStatus");
+    const peminjamanFormAlert = document.getElementById("peminjamanFormAlert");
+    const peminjamanModalTitle = document.getElementById("peminjamanModalTitle");
+    const btnSavePeminjaman = document.getElementById("btnSavePeminjaman");
+    const btnSavePeminjamanSpinner = document.getElementById("btnSavePeminjamanSpinner");
+    const btnSavePeminjamanText = document.getElementById("btnSavePeminjamanText");
+    const btnOpenAddPeminjaman = document.getElementById("btnOpenAddPeminjaman");
+    const peminjamanTableBody = document.getElementById("peminjamanTableBody");
+    const peminjamanLoading = document.getElementById("peminjamanLoading");
+    const peminjamanEmptyState = document.getElementById("peminjamanEmptyState");
+    const peminjamanCountLabel = document.getElementById("peminjamanCountLabel");
+    const searchPeminjaman = document.getElementById("searchPeminjaman");
+    const filterStatusPeminjaman = document.getElementById("filterStatusPeminjaman");
+    const statPeminjamanAktif = document.getElementById("statPeminjamanAktif");
+    const statPeminjamanTerlambat = document.getElementById("statPeminjamanTerlambat");
+    const statPeminjamanSelesai = document.getElementById("statPeminjamanSelesai");
+    const badgePeminjamanAktif = document.getElementById("badgePeminjamanAktif");
+
+    // Perawatan Elements
+    const perawatanModal = new bootstrap.Modal(document.getElementById("perawatanModal"));
+    const perawatanForm = document.getElementById("perawatanForm");
+    const perawatanIdInput = document.getElementById("perawatanId");
+    const perawatanBarangInput = document.getElementById("perawatanBarang");
+    const perawatanJenisInput = document.getElementById("perawatanJenis");
+    const perawatanTanggalInput = document.getElementById("perawatanTanggal");
+    const perawatanStatusInput = document.getElementById("perawatanStatus");
+    const perawatanBiayaInput = document.getElementById("perawatanBiaya");
+    const perawatanDeskripsiInput = document.getElementById("perawatanDeskripsi");
+    const perawatanFormAlert = document.getElementById("perawatanFormAlert");
+    const perawatanModalTitle = document.getElementById("perawatanModalTitle");
+    const btnSavePerawatan = document.getElementById("btnSavePerawatan");
+    const btnSavePerawatanSpinner = document.getElementById("btnSavePerawatanSpinner");
+    const btnSavePerawatanText = document.getElementById("btnSavePerawatanText");
+    const btnOpenAddPerawatan = document.getElementById("btnOpenAddPerawatan");
+    const perawatanTableBody = document.getElementById("perawatanTableBody");
+    const perawatanLoading = document.getElementById("perawatanLoading");
+    const perawatanEmptyState = document.getElementById("perawatanEmptyState");
+    const perawatanCountLabel = document.getElementById("perawatanCountLabel");
+    const searchPerawatan = document.getElementById("searchPerawatan");
+    const filterStatusPerawatan = document.getElementById("filterStatusPerawatan");
+    const statPerawatanAktif = document.getElementById("statPerawatanAktif");
+    const statPerawatanSelesai = document.getElementById("statPerawatanSelesai");
+    const statPerawatanBiaya = document.getElementById("statPerawatanBiaya");
+    const badgePerawatanAktif = document.getElementById("badgePerawatanAktif");
 
     // -------------------------------------------------------------
     // 4. HELPER FUNCTIONS: NOTIFIKASI & ERROR HANDLING
@@ -1300,6 +1784,44 @@
       return `<span class="badge bg-secondary">${kondisi || '-'}</span>`;
     }
 
+    // Tanggal tanpa jam dari nilai YYYY-MM-DD (<input type="date">), dibaca sebagai tanggal lokal
+    function formatTanggal(isoDate) {
+      if (!isoDate) return "-";
+      const [y, m, d] = isoDate.split("-").map(Number);
+      if (!y || !m || !d) return isoDate;
+      return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" }).format(new Date(y, m - 1, d));
+    }
+
+    function formatRupiah(angka) {
+      return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(angka) || 0);
+    }
+
+    // Badge status peminjaman ("Terlambat" dihitung, bukan disimpan) & perawatan
+    const STATUS_BADGE_CLASS = {
+      "Dipinjam": "bg-warning-subtle text-warning-emphasis border-warning-subtle",
+      "Terlambat": "bg-danger-subtle text-danger border-danger-subtle",
+      "Dikembalikan": "bg-success-subtle text-success border-success-subtle",
+      "Dijadwalkan": "bg-secondary-subtle text-secondary-emphasis border-secondary-subtle",
+      "Dalam Proses": "bg-primary-subtle text-primary border-primary-subtle",
+      "Selesai": "bg-success-subtle text-success border-success-subtle"
+    };
+
+    function getStatusBadge(status) {
+      const cls = STATUS_BADGE_CLASS[status] || "bg-light text-secondary";
+      return `<span class="badge border ${cls} px-2.5 py-1 rounded-pill">${escapeHtml(status || "-")}</span>`;
+    }
+
+    // Nama barang untuk tabel peminjaman & perawatan
+    function getNamaBarang(barangId) {
+      return inventoryData[barangId]?.namaBarang || "(barang tidak ditemukan)";
+    }
+
+    // Tampilkan daftar error validasi di dalam modal form (daftar kosong = sembunyikan)
+    function showFormAlert(alertElement, errors) {
+      alertElement.innerHTML = errors.map((err) => escapeHtml(err)).join("<br>");
+      alertElement.classList.toggle("d-none", errors.length === 0);
+    }
+
     // -------------------------------------------------------------
     // 5. AUTHENTICATION FLOW & STATE LISTENER
     // -------------------------------------------------------------
@@ -1317,13 +1839,15 @@
           navUserSection.classList.remove("d-none");
           navUserEmail.textContent = user.email;
 
-          // Aktifkan Realtime Database Listener
-          listenToInventoryChanges();
+          // Aktifkan Realtime Database Listener (inventaris, peminjaman, perawatan)
+          listenToAllChanges();
         } else {
           // --- USER BELUM LOGIN (GUEST) ---
           currentUser = null;
           inventoryData = {};
-          stopListeningToInventory();
+          peminjamanData = {};
+          perawatanData = {};
+          stopListeningToAll();
           resetChat(); // riwayat chat AI tidak boleh terbawa ke akun lain
           dashboardView.classList.add("d-none");
           navUserSection.classList.add("d-none");
@@ -1412,7 +1936,7 @@
     // Handler Logout
     btnLogout.addEventListener("click", async () => {
       // Lepas listener sebelum sesi berakhir agar tidak memicu error permission setelah logout
-      stopListeningToInventory();
+      stopListeningToAll();
       try {
         await signOut(auth);
         showToast("Anda telah berhasil keluar.", true);
@@ -1420,7 +1944,7 @@
         console.error("Logout Error:", error);
         showToast("Gagal melakukan proses logout.", false);
         // Logout gagal: pengguna masih login, aktifkan kembali sinkronisasi data
-        if (currentUser) listenToInventoryChanges();
+        if (currentUser) listenToAllChanges();
       }
     });
 
@@ -1437,6 +1961,19 @@
       }
     }
 
+    // Mulai/hentikan sinkronisasi ketiga node sekaligus (dipanggil saat login & logout)
+    function listenToAllChanges() {
+      listenToInventoryChanges();
+      listenToPeminjamanChanges();
+      listenToPerawatanChanges();
+    }
+
+    function stopListeningToAll() {
+      stopListeningToInventory();
+      stopListeningToPeminjaman();
+      stopListeningToPerawatan();
+    }
+
     // [READ / SYNC] Realtime listener via onValue()
     function listenToInventoryChanges() {
       stopListeningToInventory();
@@ -1448,6 +1985,10 @@
         const val = snapshot.val();
         inventoryData = val || {};
         renderInventoryTable();
+        // Nama & stok barang juga dipakai tab peminjaman dan perawatan
+        renderPeminjamanTable();
+        renderPerawatanTable();
+        refreshBarangOptions();
       }, (error) => {
         tableLoading.classList.add("d-none");
         if (!currentUser) return; // sesi sudah berakhir (mis. setelah logout): abaikan error permission
@@ -1567,7 +2108,7 @@
       });
 
       document.querySelectorAll(".btn-delete").forEach(btn => {
-        btn.addEventListener("click", () => openDeleteModal(btn.dataset.id, btn.dataset.name));
+        btn.addEventListener("click", () => openDeleteBarangModal(btn.dataset.id, btn.dataset.name));
       });
     }
 
@@ -1753,6 +2294,16 @@
       itemModal.show();
     }
 
+    // [CREATE] Tambah barang baru (push + set)
+    async function createBarang(payload) {
+      await set(push(inventarisRef), payload);
+    }
+
+    // [UPDATE] Perbarui data barang
+    async function updateBarang(key, payload) {
+      await update(ref(db, `inventaris/${key}`), payload);
+    }
+
     // [CREATE & UPDATE] Submit Form Handler
     itemForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1783,14 +2334,10 @@
 
       try {
         if (isEdit) {
-          // Operasi Update
-          const targetRef = ref(db, `inventaris/${key}`);
-          await update(targetRef, payload);
+          await updateBarang(key, payload);
           showToast("Data barang berhasil diperbarui!");
         } else {
-          // Operasi Create (push + set)
-          const newRef = push(inventarisRef);
-          await set(newRef, payload);
+          await createBarang(payload);
           showToast("Barang baru berhasil ditambahkan!");
         }
 
@@ -1807,32 +2354,47 @@
       }
     });
 
-    // [DELETE] Buka Modal Konfirmasi
-    function openDeleteModal(key, name) {
-      deleteTargetKey = key;
-      deleteItemNamePrompt.innerHTML = `Yakin ingin menghapus <strong>"${name}"</strong> dari inventaris?`;
+    // Modal konfirmasi hapus dipakai bersama oleh ketiga modul; run = fungsi hapus yang dijalankan
+    function openDeleteModal(title, promptHtml, successMessage, run) {
+      pendingDelete = { successMessage, run };
+      deleteModalTitle.textContent = title;
+      deleteItemNamePrompt.innerHTML = promptHtml;
       deleteModal.show();
     }
 
-    // [DELETE] Eksekusi remove()
+    // [DELETE] Buka konfirmasi hapus barang, sebutkan catatan terkait yang ikut terhapus
+    function openDeleteBarangModal(key, name) {
+      const jumlahPeminjaman = findRecordKeysByBarang(peminjamanData, key).length;
+      const jumlahPerawatan = findRecordKeysByBarang(perawatanData, key).length;
+      let prompt = `Yakin ingin menghapus <strong>"${escapeHtml(name)}"</strong> dari inventaris?`;
+      if (jumlahPeminjaman || jumlahPerawatan) {
+        prompt += `<br><span class="text-danger">${jumlahPeminjaman} catatan peminjaman dan ${jumlahPerawatan} catatan perawatan barang ini juga akan dihapus.</span>`;
+      }
+      openDeleteModal("Hapus Barang Ini?", prompt, "Barang berhasil dihapus dari inventaris.", () => deleteBarang(key));
+    }
+
+    // [DELETE] Hapus barang beserta catatan peminjaman & perawatannya dalam satu multi-path update
+    async function deleteBarang(key) {
+      await update(ref(db), buildHapusBarangUpdates(key, peminjamanData, perawatanData));
+    }
+
     btnConfirmDelete.addEventListener("click", async () => {
-      if (!deleteTargetKey) return;
+      if (!pendingDelete) return;
 
       btnConfirmDelete.disabled = true;
       btnDeleteSpinner.classList.remove("d-none");
 
       try {
-        const targetRef = ref(db, `inventaris/${deleteTargetKey}`);
-        await remove(targetRef);
-        showToast("Barang berhasil dihapus dari inventaris.");
+        await pendingDelete.run();
+        showToast(pendingDelete.successMessage);
+        pendingDelete = null;
         deleteModal.hide();
       } catch (error) {
         console.error("Gagal menghapus:", error);
-        showToast("Gagal menghapus barang. Periksa hak akses database.", false);
+        showToast("Gagal menghapus data. Periksa hak akses database.", false);
       } finally {
         btnConfirmDelete.disabled = false;
         btnDeleteSpinner.classList.add("d-none");
-        deleteTargetKey = null;
       }
     });
 
@@ -1841,8 +2403,481 @@
     filterKategori.addEventListener("change", renderInventoryTable);
     filterKondisi.addEventListener("change", renderInventoryTable);
 
+    // Isi <select> barang pada form peminjaman & perawatan dari cache inventaris.
+    // Pilihan yang sedang dipilih dipertahankan agar update realtime tidak mengganggu form yang terbuka.
+    function fillBarangSelect(select, withStock) {
+      const selected = select.value;
+      const keys = Object.keys(inventoryData).sort((a, b) =>
+        (inventoryData[a].namaBarang || "").localeCompare(inventoryData[b].namaBarang || "", "id"));
+
+      select.innerHTML = `<option value="" disabled selected>Pilih Barang</option>` + keys.map((key) => {
+        const item = inventoryData[key];
+        let label = `${item.namaBarang || "-"} — ${item.lokasi || "-"}`;
+        if (withStock) {
+          const tersedia = (parseInt(item.jumlah, 10) || 0) - hitungUnitDipinjam(peminjamanData, key);
+          label += ` (tersedia ${Math.max(tersedia, 0)} dari ${item.jumlah || 0} unit)`;
+        }
+        return `<option value="${key}">${escapeHtml(label)}</option>`;
+      }).join("");
+      select.value = selected;
+    }
+
+    function refreshBarangOptions() {
+      fillBarangSelect(peminjamanBarangInput, true);
+      fillBarangSelect(perawatanBarangInput, false);
+    }
+
+    // -------------------------------------------------------------
+    // 7. CRUD PEMINJAMAN BARANG (NODE: /peminjaman)
+    // -------------------------------------------------------------
+    const peminjamanRef = ref(db, "peminjaman");
+
+    function stopListeningToPeminjaman() {
+      if (unsubscribePeminjaman) {
+        unsubscribePeminjaman();
+        unsubscribePeminjaman = null;
+      }
+    }
+
+    // [READ / SYNC] Realtime listener via onValue()
+    function listenToPeminjamanChanges() {
+      stopListeningToPeminjaman();
+      peminjamanLoading.classList.remove("d-none");
+      peminjamanEmptyState.classList.add("d-none");
+
+      unsubscribePeminjaman = onValue(peminjamanRef, (snapshot) => {
+        peminjamanLoading.classList.add("d-none");
+        peminjamanData = snapshot.val() || {};
+        renderPeminjamanTable();
+        refreshBarangOptions(); // unit tersedia ikut berubah
+      }, (error) => {
+        peminjamanLoading.classList.add("d-none");
+        if (!currentUser) return; // sesi sudah berakhir: abaikan error permission
+        console.error("Database onValue error (peminjaman):", error);
+        showToast("Gagal memuat data peminjaman. Periksa Realtime Database Security Rules!", false);
+      });
+    }
+
+    // [CREATE] Catat peminjaman baru (push + set)
+    async function createPeminjaman(payload) {
+      await set(push(peminjamanRef), payload);
+    }
+
+    // [UPDATE] Perbarui data peminjaman dari form edit
+    async function updatePeminjaman(key, payload) {
+      await update(ref(db, `peminjaman/${key}`), payload);
+    }
+
+    // [UPDATE] Tandai barang sudah dikembalikan (aksi cepat dari tabel)
+    async function kembalikanPeminjaman(key) {
+      await update(ref(db, `peminjaman/${key}`), {
+        status: "Dikembalikan",
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // [DELETE] Hapus catatan peminjaman
+    async function deletePeminjaman(key) {
+      await remove(ref(db, `peminjaman/${key}`));
+    }
+
+    function renderPeminjamanTable() {
+      const today = toIsoDate(new Date());
+      const searchTerm = searchPeminjaman.value.toLowerCase().trim();
+      const statusFilter = filterStatusPeminjaman.value;
+      const keys = Object.keys(peminjamanData);
+
+      let countAktif = 0;
+      let countTerlambat = 0;
+      keys.forEach((k) => {
+        if (peminjamanData[k].status === "Dipinjam") countAktif++;
+        if (isPeminjamanTerlambat(peminjamanData[k], today)) countTerlambat++;
+      });
+
+      statPeminjamanAktif.textContent = countAktif.toLocaleString("id-ID");
+      statPeminjamanTerlambat.textContent = countTerlambat.toLocaleString("id-ID");
+      statPeminjamanSelesai.textContent = (keys.length - countAktif).toLocaleString("id-ID");
+      badgePeminjamanAktif.textContent = countAktif;
+
+      // "Terlambat" bukan status tersimpan, melainkan dihitung dari batas kembali
+      const filteredKeys = keys.filter((key) => {
+        const p = peminjamanData[key];
+        const matchesSearch = !searchTerm ||
+          getNamaBarang(p.barangId).toLowerCase().includes(searchTerm) ||
+          (p.peminjam || "").toLowerCase().includes(searchTerm);
+        const matchesStatus = !statusFilter ||
+          (statusFilter === "Terlambat" ? isPeminjamanTerlambat(p, today) : p.status === statusFilter);
+        return matchesSearch && matchesStatus;
+      }).sort((a, b) => (peminjamanData[b].tanggalPinjam || "").localeCompare(peminjamanData[a].tanggalPinjam || ""));
+
+      peminjamanCountLabel.textContent = `Menampilkan ${filteredKeys.length} dari ${keys.length} peminjaman`;
+      const isLoading = !peminjamanLoading.classList.contains("d-none");
+      peminjamanEmptyState.classList.toggle("d-none", isLoading || filteredKeys.length > 0);
+
+      peminjamanTableBody.innerHTML = filteredKeys.map((key, index) => {
+        const p = peminjamanData[key];
+        const terlambat = isPeminjamanTerlambat(p, today);
+        const btnKembalikan = p.status === "Dipinjam"
+          ? `<button class="btn btn-outline-success" data-action="kembalikan" data-id="${key}" title="Tandai Sudah Dikembalikan">
+               <i class="bi bi-box-arrow-in-down-left"></i>
+             </button>`
+          : "";
+
+        return `
+          <tr>
+            <td class="text-center text-muted fw-semibold">${index + 1}</td>
+            <td>
+              <div class="fw-bold text-dark">${escapeHtml(getNamaBarang(p.barangId))}</div>
+              <small class="text-muted" style="font-size: 0.75rem;">Oleh: ${escapeHtml(p.createdBy || "-")}</small>
+            </td>
+            <td class="fw-medium">${escapeHtml(p.peminjam || "-")}</td>
+            <td class="text-center"><span class="fw-semibold">${p.jumlah || 0}</span></td>
+            <td><span class="small">${formatTanggal(p.tanggalPinjam)}</span></td>
+            <td><span class="small ${terlambat ? "text-danger fw-semibold" : ""}">${formatTanggal(p.tanggalKembali)}</span></td>
+            <td>${getStatusBadge(terlambat ? "Terlambat" : p.status)}</td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm" role="group">
+                ${btnKembalikan}
+                <button class="btn btn-outline-primary" data-action="edit" data-id="${key}" title="Edit Peminjaman">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <button class="btn btn-outline-danger" data-action="hapus" data-id="${key}" title="Hapus Peminjaman">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Buka form peminjaman: tanpa key = catat baru, dengan key = edit
+    function openPeminjamanModal(key = "") {
+      if (!key && Object.keys(inventoryData).length === 0) {
+        showToast("Tambahkan barang ke inventaris terlebih dahulu.", false);
+        return;
+      }
+      const p = key ? peminjamanData[key] : null;
+
+      peminjamanForm.reset();
+      peminjamanForm.classList.remove("was-validated");
+      showFormAlert(peminjamanFormAlert, []);
+      refreshBarangOptions();
+
+      peminjamanIdInput.value = key;
+      peminjamanBarangInput.value = p?.barangId || "";
+      peminjamanPeminjamInput.value = p?.peminjam || "";
+      peminjamanJumlahInput.value = p?.jumlah || 1;
+      peminjamanTanggalPinjamInput.value = p?.tanggalPinjam || toIsoDate(new Date());
+      peminjamanTanggalKembaliInput.value = p?.tanggalKembali || "";
+      peminjamanStatusInput.value = p?.status || "Dipinjam";
+
+      peminjamanModalTitle.textContent = key ? "Edit Data Peminjaman" : "Catat Peminjaman Baru";
+      btnSavePeminjamanText.textContent = key ? "Perbarui Data" : "Simpan Data";
+      peminjamanModal.show();
+    }
+
+    btnOpenAddPeminjaman.addEventListener("click", () => openPeminjamanModal());
+
+    // Aksi tombol pada baris tabel (event delegation)
+    peminjamanTableBody.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const key = btn.dataset.id;
+      const p = peminjamanData[key];
+      if (!p) return;
+
+      if (btn.dataset.action === "edit") {
+        openPeminjamanModal(key);
+      } else if (btn.dataset.action === "hapus") {
+        openDeleteModal(
+          "Hapus Catatan Peminjaman?",
+          `Yakin ingin menghapus peminjaman <strong>"${escapeHtml(getNamaBarang(p.barangId))}"</strong> oleh <strong>${escapeHtml(p.peminjam || "-")}</strong>?`,
+          "Catatan peminjaman berhasil dihapus.",
+          () => deletePeminjaman(key)
+        );
+      } else if (btn.dataset.action === "kembalikan") {
+        btn.disabled = true;
+        try {
+          await kembalikanPeminjaman(key);
+          showToast("Barang ditandai sudah dikembalikan.");
+        } catch (error) {
+          console.error("Gagal memperbarui status peminjaman:", error);
+          showToast("Gagal memperbarui status peminjaman.", false);
+          btn.disabled = false;
+        }
+      }
+    });
+
+    // [CREATE & UPDATE] Submit form peminjaman
+    peminjamanForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showFormAlert(peminjamanFormAlert, []);
+
+      if (!peminjamanForm.checkValidity()) {
+        e.stopPropagation();
+        peminjamanForm.classList.add("was-validated");
+        return;
+      }
+
+      const key = peminjamanIdInput.value;
+      const isEdit = Boolean(key);
+
+      const peminjamanPayload = {
+        barangId: peminjamanBarangInput.value,
+        peminjam: peminjamanPeminjamInput.value.trim(),
+        jumlah: parseInt(peminjamanJumlahInput.value, 10) || 1,
+        tanggalPinjam: peminjamanTanggalPinjamInput.value,
+        tanggalKembali: peminjamanTanggalKembaliInput.value,
+        status: peminjamanStatusInput.value,
+        createdBy: currentUser ? currentUser.email : "Anonim",
+        updatedAt: new Date().toISOString()
+      };
+
+      const errors = validatePeminjaman(peminjamanPayload, inventoryData, peminjamanData, key || null);
+      if (errors.length > 0) {
+        showFormAlert(peminjamanFormAlert, errors);
+        return;
+      }
+
+      btnSavePeminjaman.disabled = true;
+      btnSavePeminjamanSpinner.classList.remove("d-none");
+      btnSavePeminjamanText.textContent = isEdit ? "Memperbarui..." : "Menyimpan...";
+
+      try {
+        if (isEdit) {
+          await updatePeminjaman(key, peminjamanPayload);
+          showToast("Data peminjaman berhasil diperbarui!");
+        } else {
+          await createPeminjaman(peminjamanPayload);
+          showToast("Peminjaman berhasil dicatat!");
+        }
+        peminjamanModal.hide();
+      } catch (error) {
+        console.error("Gagal menyimpan peminjaman:", error);
+        showToast("Gagal menyimpan data peminjaman. Periksa koneksi dan security rules.", false);
+      } finally {
+        btnSavePeminjaman.disabled = false;
+        btnSavePeminjamanSpinner.classList.add("d-none");
+        btnSavePeminjamanText.textContent = isEdit ? "Perbarui Data" : "Simpan Data";
+      }
+    });
+
+    searchPeminjaman.addEventListener("input", renderPeminjamanTable);
+    filterStatusPeminjaman.addEventListener("change", renderPeminjamanTable);
+
+    // -------------------------------------------------------------
+    // 8. CRUD PERAWATAN BARANG (NODE: /perawatan)
+    // -------------------------------------------------------------
+    const perawatanRef = ref(db, "perawatan");
+
+    function stopListeningToPerawatan() {
+      if (unsubscribePerawatan) {
+        unsubscribePerawatan();
+        unsubscribePerawatan = null;
+      }
+    }
+
+    // [READ / SYNC] Realtime listener via onValue()
+    function listenToPerawatanChanges() {
+      stopListeningToPerawatan();
+      perawatanLoading.classList.remove("d-none");
+      perawatanEmptyState.classList.add("d-none");
+
+      unsubscribePerawatan = onValue(perawatanRef, (snapshot) => {
+        perawatanLoading.classList.add("d-none");
+        perawatanData = snapshot.val() || {};
+        renderPerawatanTable();
+      }, (error) => {
+        perawatanLoading.classList.add("d-none");
+        if (!currentUser) return; // sesi sudah berakhir: abaikan error permission
+        console.error("Database onValue error (perawatan):", error);
+        showToast("Gagal memuat data perawatan. Periksa Realtime Database Security Rules!", false);
+      });
+    }
+
+    // [CREATE] Catat perawatan baru (push + set)
+    async function createPerawatan(payload) {
+      await set(push(perawatanRef), payload);
+    }
+
+    // [UPDATE] Perbarui data perawatan
+    async function updatePerawatan(key, payload) {
+      await update(ref(db, `perawatan/${key}`), payload);
+    }
+
+    // [DELETE] Hapus catatan perawatan
+    async function deletePerawatan(key) {
+      await remove(ref(db, `perawatan/${key}`));
+    }
+
+    function renderPerawatanTable() {
+      const searchTerm = searchPerawatan.value.toLowerCase().trim();
+      const statusFilter = filterStatusPerawatan.value;
+      const keys = Object.keys(perawatanData);
+
+      let countSelesai = 0;
+      let totalBiaya = 0;
+      keys.forEach((k) => {
+        if (perawatanData[k].status === "Selesai") countSelesai++;
+        totalBiaya += Number(perawatanData[k].biaya) || 0;
+      });
+
+      statPerawatanAktif.textContent = (keys.length - countSelesai).toLocaleString("id-ID");
+      statPerawatanSelesai.textContent = countSelesai.toLocaleString("id-ID");
+      statPerawatanBiaya.textContent = formatRupiah(totalBiaya);
+      badgePerawatanAktif.textContent = keys.length - countSelesai;
+
+      const filteredKeys = keys.filter((key) => {
+        const r = perawatanData[key];
+        const matchesSearch = !searchTerm ||
+          getNamaBarang(r.barangId).toLowerCase().includes(searchTerm) ||
+          (r.jenis || "").toLowerCase().includes(searchTerm) ||
+          (r.deskripsi || "").toLowerCase().includes(searchTerm);
+        const matchesStatus = !statusFilter || r.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      }).sort((a, b) => (perawatanData[b].tanggal || "").localeCompare(perawatanData[a].tanggal || ""));
+
+      perawatanCountLabel.textContent = `Menampilkan ${filteredKeys.length} dari ${keys.length} perawatan`;
+      const isLoading = !perawatanLoading.classList.contains("d-none");
+      perawatanEmptyState.classList.toggle("d-none", isLoading || filteredKeys.length > 0);
+
+      perawatanTableBody.innerHTML = filteredKeys.map((key, index) => {
+        const r = perawatanData[key];
+        return `
+          <tr>
+            <td class="text-center text-muted fw-semibold">${index + 1}</td>
+            <td>
+              <div class="fw-bold text-dark">${escapeHtml(getNamaBarang(r.barangId))}</div>
+              <small class="text-muted" style="font-size: 0.75rem;">Oleh: ${escapeHtml(r.createdBy || "-")}</small>
+            </td>
+            <td><span class="badge bg-light text-dark border px-2 py-1">${escapeHtml(r.jenis || "-")}</span></td>
+            <td><div class="small text-truncate" style="max-width: 260px;" title="${escapeHtml(r.deskripsi || "")}">${escapeHtml(r.deskripsi || "-")}</div></td>
+            <td><span class="small">${formatTanggal(r.tanggal)}</span></td>
+            <td class="text-end"><span class="fw-semibold small">${formatRupiah(r.biaya)}</span></td>
+            <td>${getStatusBadge(r.status)}</td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm" role="group">
+                <button class="btn btn-outline-primary" data-action="edit" data-id="${key}" title="Edit Perawatan">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <button class="btn btn-outline-danger" data-action="hapus" data-id="${key}" title="Hapus Perawatan">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Buka form perawatan: tanpa key = catat baru, dengan key = edit
+    function openPerawatanModal(key = "") {
+      if (!key && Object.keys(inventoryData).length === 0) {
+        showToast("Tambahkan barang ke inventaris terlebih dahulu.", false);
+        return;
+      }
+      const r = key ? perawatanData[key] : null;
+
+      perawatanForm.reset();
+      perawatanForm.classList.remove("was-validated");
+      showFormAlert(perawatanFormAlert, []);
+      refreshBarangOptions();
+
+      perawatanIdInput.value = key;
+      perawatanBarangInput.value = r?.barangId || "";
+      perawatanJenisInput.value = r?.jenis || "";
+      perawatanTanggalInput.value = r?.tanggal || toIsoDate(new Date());
+      perawatanStatusInput.value = r?.status || "Dijadwalkan";
+      perawatanBiayaInput.value = r?.biaya ?? 0;
+      perawatanDeskripsiInput.value = r?.deskripsi || "";
+
+      perawatanModalTitle.textContent = key ? "Edit Data Perawatan" : "Catat Perawatan Baru";
+      btnSavePerawatanText.textContent = key ? "Perbarui Data" : "Simpan Data";
+      perawatanModal.show();
+    }
+
+    btnOpenAddPerawatan.addEventListener("click", () => openPerawatanModal());
+
+    // Aksi tombol pada baris tabel (event delegation)
+    perawatanTableBody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const key = btn.dataset.id;
+      const r = perawatanData[key];
+      if (!r) return;
+
+      if (btn.dataset.action === "edit") {
+        openPerawatanModal(key);
+      } else if (btn.dataset.action === "hapus") {
+        openDeleteModal(
+          "Hapus Catatan Perawatan?",
+          `Yakin ingin menghapus catatan <strong>${escapeHtml(r.jenis || "perawatan")}</strong> untuk <strong>"${escapeHtml(getNamaBarang(r.barangId))}"</strong>?`,
+          "Catatan perawatan berhasil dihapus.",
+          () => deletePerawatan(key)
+        );
+      }
+    });
+
+    // [CREATE & UPDATE] Submit form perawatan
+    perawatanForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showFormAlert(perawatanFormAlert, []);
+
+      if (!perawatanForm.checkValidity()) {
+        e.stopPropagation();
+        perawatanForm.classList.add("was-validated");
+        return;
+      }
+
+      const key = perawatanIdInput.value;
+      const isEdit = Boolean(key);
+
+      const perawatanPayload = {
+        barangId: perawatanBarangInput.value,
+        jenis: perawatanJenisInput.value,
+        deskripsi: perawatanDeskripsiInput.value.trim(),
+        tanggal: perawatanTanggalInput.value,
+        biaya: parseInt(perawatanBiayaInput.value, 10) || 0,
+        status: perawatanStatusInput.value,
+        createdBy: currentUser ? currentUser.email : "Anonim",
+        updatedAt: new Date().toISOString()
+      };
+
+      const errors = validatePerawatan(perawatanPayload, inventoryData);
+      if (errors.length > 0) {
+        showFormAlert(perawatanFormAlert, errors);
+        return;
+      }
+
+      btnSavePerawatan.disabled = true;
+      btnSavePerawatanSpinner.classList.remove("d-none");
+      btnSavePerawatanText.textContent = isEdit ? "Memperbarui..." : "Menyimpan...";
+
+      try {
+        if (isEdit) {
+          await updatePerawatan(key, perawatanPayload);
+          showToast("Data perawatan berhasil diperbarui!");
+        } else {
+          await createPerawatan(perawatanPayload);
+          showToast("Perawatan berhasil dicatat!");
+        }
+        perawatanModal.hide();
+      } catch (error) {
+        console.error("Gagal menyimpan perawatan:", error);
+        showToast("Gagal menyimpan data perawatan. Periksa koneksi dan security rules.", false);
+      } finally {
+        btnSavePerawatan.disabled = false;
+        btnSavePerawatanSpinner.classList.add("d-none");
+        btnSavePerawatanText.textContent = isEdit ? "Perbarui Data" : "Simpan Data";
+      }
+    });
+
+    searchPerawatan.addEventListener("input", renderPerawatanTable);
+    filterStatusPerawatan.addEventListener("change", renderPerawatanTable);
+
     // =============================================================
-    // 6. GEMINI AI CHAT INTEGRATION (Model Terbaru & Railway Config)
+    // 9. GEMINI AI CHAT INTEGRATION (Model Terbaru & Railway Config)
     // =============================================================
     const btnGeminiChatToggle = document.getElementById("btnGeminiChatToggle");
     const geminiChatWindow = document.getElementById("geminiChatWindow");
