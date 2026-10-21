@@ -1,6 +1,8 @@
 # 📋 LAPORAN PROGRESS CHECKPOINT 3 (95%)
 ## Sistem Inventaris Barang Laboratorium & Kantor (SPA)
 
+> **Catatan:** Ini adalah dokumen historis progres Checkpoint 3 (13 Oktober 2026). Isinya, termasuk platform deployment, repositori, akun demo, dan cuplikan kode, sudah tidak sesuai dengan kondisi terbaru. Kondisi terkini (deployment Google Cloud Run, modul peminjaman & perawatan, verifikasi email, dan akun demo) ada di [`LAPORAN_AKHIR.md`](LAPORAN_AKHIR.md).
+
 - **Mata Kuliah / Proyek**: Tugas Proyek Pengembangan Aplikasi Web (Checkpoint 3)
 - **Status Progres**: **95% Selesai** (Fitur Utama CRUD, Autentikasi, Analytics Ruangan, & Integrasi Gemini AI Berfungsi Penuh)
 - **Teknologi**: HTML5, Bootstrap 5.3, Firebase Modular SDK v10 (Auth & Realtime Database), Google Gemini 3.8 Flash API, Vite

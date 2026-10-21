@@ -1466,11 +1466,11 @@
       <div class="mb-2">
         <label for="geminiApiKeyInput" class="form-label small text-muted mb-1" style="font-size: 0.75rem;">Gemini API Key (Google AI Studio)</label>
         <div class="input-group input-group-sm">
-          <input type="password" class="form-control" id="geminiApiKeyInput" placeholder="Masukkan API Key jika belum diset di Railway" />
+          <input type="password" class="form-control" id="geminiApiKeyInput" placeholder="Masukkan API Key untuk uji coba lokal" />
           <button class="btn btn-outline-secondary" type="button" id="btnToggleApiKeyVisibility"><i class="bi bi-eye"></i></button>
         </div>
         <div class="small mt-1" id="geminiApiKeyStatusNote" style="font-size: 0.7rem; color: #64748b;">
-          Di Railway, tambahkan variable <code>VITE_GEMINI_API_KEY</code>.
+          Untuk pengembangan lokal, isi <code>VITE_GEMINI_API_KEY</code> di <code>.env.local</code>.
         </div>
       </div>
       <div class="mb-2">
@@ -1590,7 +1590,7 @@
 
     // -------------------------------------------------------------
     // 2. FIREBASE CONFIGURATION (Vite Environment Variables)
-    //    Mendukung Railway, Vercel, Netlify, serta file .env.local
+    //    Diisi Vite saat build dari file .env.local (lihat .env.example)
     // -------------------------------------------------------------
     const env = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : {};
 
@@ -1611,7 +1611,7 @@
     try {
       if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("YOUR_API_KEY")) {
         isFirebaseConfigured = false;
-        console.warn("PERINGATAN: Konfigurasi Firebase belum diatur. Di Railway, tambahkan Variables VITE_FIREBASE_* sesuai .env.example.");
+        console.warn("PERINGATAN: Konfigurasi Firebase belum diatur. Isi VITE_FIREBASE_* di .env.local sesuai .env.example.");
       }
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
@@ -3018,7 +3018,7 @@
     filterStatusPerawatan.addEventListener("change", renderPerawatanTable);
 
     // =============================================================
-    // 9. GEMINI AI CHAT INTEGRATION (Model Terbaru & Railway Config)
+    // 9. GEMINI AI CHAT INTEGRATION (Proxy Cloud Run / API Key Lokal)
     // =============================================================
     const btnGeminiChatToggle = document.getElementById("btnGeminiChatToggle");
     const geminiChatWindow = document.getElementById("geminiChatWindow");
@@ -3046,7 +3046,7 @@
     // sehingga API key tidak pernah sampai ke browser
     const GEMINI_PROXY_URL = (env.VITE_GEMINI_PROXY_URL || "").trim();
 
-    // Helper: Mendapatkan API Key aktif (Railway Environment vs Local Storage)
+    // Helper: Mendapatkan API Key aktif untuk mode tanpa proxy (environment build vs Local Storage)
     function getActiveGeminiApiKey() {
       return (env.VITE_GEMINI_API_KEY && env.VITE_GEMINI_API_KEY.trim() && !env.VITE_GEMINI_API_KEY.includes("YOUR_GEMINI_API_KEY"))
         ? env.VITE_GEMINI_API_KEY.trim()
@@ -3075,7 +3075,7 @@
       } else if (env.VITE_GEMINI_API_KEY && env.VITE_GEMINI_API_KEY.trim() && !env.VITE_GEMINI_API_KEY.includes("YOUR_GEMINI_API_KEY")) {
         geminiApiKeyInput.value = "••••••••••••••••••••••••";
         geminiApiKeyInput.disabled = true;
-        geminiApiKeyStatusNote.innerHTML = '<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>Tersambung via Environment Railway (VITE_GEMINI_API_KEY)</span>';
+        geminiApiKeyStatusNote.innerHTML = '<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>Tersambung via environment build (VITE_GEMINI_API_KEY)</span>';
       } else if (localStorage.getItem("custom_gemini_api_key")) {
         geminiApiKeyInput.value = localStorage.getItem("custom_gemini_api_key");
         geminiApiKeyInput.disabled = false;
@@ -3083,7 +3083,7 @@
       } else {
         geminiApiKeyInput.value = "";
         geminiApiKeyInput.disabled = false;
-        geminiApiKeyStatusNote.innerHTML = '<span class="text-danger fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Belum dikonfigurasi. Masukkan VITE_GEMINI_API_KEY di Railway atau isi di sini.</span>';
+        geminiApiKeyStatusNote.innerHTML = '<span class="text-danger fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Belum dikonfigurasi. Isi VITE_GEMINI_API_KEY di .env.local atau masukkan di sini.</span>';
       }
     }
 
@@ -3507,8 +3507,7 @@ Jika pengguna bertanya tentang barang atau ruangan yang tidak tercantum dalam da
       } else if (!apiKey) {
         const notice = `⚠️ **Gemini API Key belum terkonfigurasi.**<br><br>
 Agar asisten AI dapat menjawab:<br>
-1. <strong>Di Railway:</strong> Buka Project Anda &rarr; <em>Variables</em> &rarr; Tambahkan:<br>
-<code>VITE_GEMINI_API_KEY = your_gemini_api_key</code><br><br>
+1. <strong>Pengembangan lokal:</strong> isi <code>VITE_GEMINI_API_KEY</code> di file <code>.env.local</code>, atau gunakan build Cloud Run yang memanggil Gemini lewat proxy server.<br><br>
 2. <strong>Uji Langsung:</strong> Klik ikon <i class="bi bi-gear-fill"></i> <strong>Pengaturan</strong> di kanan atas chat ini untuk memasukkan API Key secara langsung (dapat dibuat gratis di <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio</a>).`;
         appendChatMessage("bot", notice, false);
         geminiSettingsPanel.classList.remove("d-none");
