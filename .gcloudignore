@@ -3,5 +3,9 @@
 *
 !Dockerfile
 !server.mjs
+# server.mjs memakai src/ai-config.mjs, jadi hanya berkas itu dari src/ yang ikut
+!src/
+src/*
+!src/ai-config.mjs
 !dist/
 !dist/**

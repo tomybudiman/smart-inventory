@@ -2,9 +2,12 @@
 // - Menyajikan hasil build (dist/) dari `npm run build:cloudrun`.
 // - Meneruskan request Gemini dari petugas yang sudah login dan emailnya terverifikasi,
 //   sehingga GEMINI_API_KEY hanya ada di server dan tidak pernah sampai ke browser.
+// - Instruksi sistem (termasuk batasan topik), alat, dan konfigurasi Gemini disusun di sini dari
+//   src/ai-config.mjs; dari browser hanya percakapan & ringkasan data yang diterima.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
+import { buildGeminiRequest, validateChatRequest } from "./src/ai-config.mjs";
 
 const PORT = Number(process.env.PORT) || 8080;
 const DIST_DIR = process.env.DIST_DIR || join(import.meta.dirname, "dist");
@@ -23,7 +26,6 @@ const ALLOWED_MODELS = new Set([
   "gemini-1.5-flash"
 ]);
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
-const MAX_OUTPUT_TOKENS = 2048;
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -81,16 +83,11 @@ async function handleGemini(req, res, model) {
   const { body, error } = await readJsonBody(req);
   if (error) return sendError(res, ...error);
 
-  // Hanya field yang dipakai aplikasi yang diteruskan, dengan batas panjang jawaban
-  const upstreamBody = {
-    system_instruction: body.system_instruction,
-    contents: body.contents,
-    tools: body.tools,
-    generationConfig: {
-      temperature: body.generationConfig?.temperature,
-      maxOutputTokens: Math.min(Number(body.generationConfig?.maxOutputTokens) || MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS)
-    }
-  };
+  // Dari browser hanya percakapan & ringkasan data yang dipakai (diperiksa ukuran dan jenisnya).
+  // Instruksi, alat, dan batas panjang jawaban disusun server, jadi tidak dapat diubah lewat request.
+  const chat = validateChatRequest(body);
+  if (chat.error) return sendError(res, 400, chat.error);
+  const upstreamBody = buildGeminiRequest(chat);
 
   const upstream = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
     method: "POST",

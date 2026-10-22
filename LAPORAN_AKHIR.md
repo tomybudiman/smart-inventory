@@ -34,8 +34,9 @@
 6. **Asisten AI membaca data peminjaman & perawatan**: dapat menjawab barang yang sedang dipinjam, unit tersedia, keterlambatan, dan riwayat perawatan.
 7. **Asisten AI dapat melakukan CRUD lewat kartu konfirmasi**: tambah/ubah/hapus barang dan catat/ubah/hapus peminjaman & perawatan, dengan validasi yang sama seperti form dan pemeriksaan ulang terhadap data terbaru tepat sebelum disimpan.
 8. **Asisten AI memakai fungsi baca** (`cariBarang`, `cariPeminjaman`, `cariPerawatan`, `rekapInventaris`): angka, rekap, dan filter dihitung oleh aplikasi pada data realtime lalu dikirim kembali ke Gemini, sehingga jawaban lebih akurat dan tetap ringkas saat data bertambah.
-9. **Kode dipecah per fitur**: `index.html` kini hanya berisi markup; CSS ada di `src/styles/` dan JavaScript di modul ES `src/app/` (auth, inventaris, peminjaman, perawatan, asisten AI), digabungkan kembali oleh Vite saat build.
-10. **Security Rules dengan validasi skema** untuk ketiga node, dan **104 pengujian otomatis** (`npm test`).
+9. **Asisten AI dibatasi untuk urusan inventaris**: instruksi (termasuk batasan topik), daftar fungsi, dan batas jawaban disusun oleh server sehingga tidak dapat diubah dari browser; pertanyaan di luar topik (misalnya coding) ditolak, dan request yang terlalu besar atau berisi gambar/file ditolak server.
+10. **Kode dipecah per fitur**: `index.html` kini hanya berisi markup; CSS ada di `src/styles/` dan JavaScript di modul ES `src/app/` (auth, inventaris, peminjaman, perawatan, asisten AI), digabungkan kembali oleh Vite saat build.
+11. **Security Rules dengan validasi skema** untuk ketiga node, dan **121 pengujian otomatis** (`npm test`).
 
 ---
 
@@ -540,6 +541,8 @@ npm run deploy:cloudrun
 - **Gemini API key hanya ada di server** (environment variable Cloud Run), tidak tertanam di JavaScript yang diunduh browser.
 - **Proxy Gemini** memverifikasi Firebase ID token lewat Identity Toolkit, menolak akun yang emailnya belum diverifikasi (403), hanya mengizinkan model dari daftar, membatasi panjang jawaban (2048 token) dan ukuran request (2 MB), serta hanya meneruskan field yang dipakai aplikasi.
 - **Security Rules** mewajibkan login dengan email terverifikasi dan memvalidasi setiap field.
+- **Asisten AI hanya untuk urusan inventaris**: instruksi sistem berisi batasan topik dan jawaban penolakan baku untuk permintaan lain (misalnya menulis kode). Instruksi, daftar fungsi, dan batas jawaban disusun server dari `src/ai-config.mjs`, jadi tidak dapat diganti walaupun proxy dipanggil langsung; data dari database disisipkan sebagai data dalam blok `<data>`, bukan sebagai instruksi.
+- **Batas ukuran request di server**: pesan petugas maksimal 1.000 karakter, riwayat maksimal 40 entri, total percakapan dan ringkasan data dibatasi, serta hanya teks dan pemanggilan fungsi yang diizinkan (gambar/file ditolak).
 - **Aksi asisten AI tidak pernah langsung menulis data**: Gemini hanya mengusulkan; aplikasi memvalidasi usulan, menampilkannya sebagai kartu konfirmasi, memeriksanya ulang dengan data terbaru, lalu menyimpannya dengan akun petugas sehingga Security Rules tetap berlaku.
 - **Pencegahan XSS**: semua data dari database dan jawaban AI di-*escape* sebelum ditampilkan.
 
@@ -547,13 +550,14 @@ npm run deploy:cloudrun
 
 ## 🧪 Pengujian
 
-`npm test` menjalankan **104 pengujian otomatis** (Node.js test runner, tanpa dependensi tambahan):
+`npm test` menjalankan **121 pengujian otomatis** (Node.js test runner, tanpa dependensi tambahan):
 
 - **`tests/inventory-logic.test.mjs`**: validasi usulan AI, validasi peminjaman & perawatan (stok tersedia, tanggal, biaya), status terlambat, hapus berantai, konteks AI (inventaris, peminjaman, perawatan), escape HTML, markdown, dan pesan error auth.
+- **`tests/ai-config.test.mjs`**: konfigurasi asisten AI (pilihan sama dengan form, setiap fungsi yang dideklarasikan benar-benar ditangani, batasan topik pada instruksi, data tidak dapat keluar dari blok `<data>`, validasi ukuran & jenis isi request).
 - **`tests/ai-queries.test.mjs`**: fungsi baca asisten AI (filter, total unit & biaya, unit tersedia, hari keterlambatan, rekap per kategori/kondisi/lokasi) dan ringkasan data untuk Gemini saat data besar.
 - **`tests/ai-actions.test.mjs`**: penyusunan & validasi usulan aksi asisten AI (ubah/hapus barang, catat/ubah/hapus peminjaman & perawatan, ID tidak dikenal, stok, format tanggal).
 - **`tests/rules.test.mjs`**: kesesuaian `database.rules.json` dengan form (pilihan kategori/kondisi/status/jenis, field wajib, syarat email terverifikasi); markup form dibaca dari `index.html` dan payload dari modul `src/app/`.
-- **`tests/server.test.mjs`**: server proxy sebagai proses sungguhan dengan layanan Google tiruan (token tidak valid → 401, email belum diverifikasi → 403, pembatasan model, penyaringan field, path traversal).
+- **`tests/server.test.mjs`**: server proxy sebagai proses sungguhan dengan layanan Google tiruan (token tidak valid → 401, email belum diverifikasi → 403, instruksi/fungsi/konfigurasi kiriman browser diabaikan, request terlalu besar atau berisi gambar/fungsi liar → 400, pembatasan model, penyaringan field, path traversal).
 
 Selama pengembangan, Security Rules dan alur aplikasi juga diuji di **Firebase Emulator Suite** (Authentication + Realtime Database) dengan skenario end-to-end di Chrome: register → email verifikasi → dashboard, CRUD di ketiga modul, validasi stok, status terlambat, hapus berantai, CRUD lewat kartu konfirmasi asisten AI, fungsi baca bertahap (model meminta data → aplikasi menjawab → model menjawab petugas, dibatasi 5 langkah) dengan respons Gemini disimulasikan, serta tampilan ponsel. Skrip uji emulator ini dijalankan terpisah dan tidak disertakan di repositori.
 
@@ -565,10 +569,10 @@ Pengiriman email verifikasi juga sudah dicoba langsung di aplikasi produksi: ema
 
 - **Branch Utama**: `master`
 - **Komit Terakhir**:
+  - `778dfba feat: Add AI actions and queries for inventory, loans, and maintenance management with validation, testing, and comprehensive logic`
   - `af8dbe5 feat: Implement Firebase authentication for user login, registration, email verification, and logout; add AI-powered "Gemini Chat" widget.`
   - `339e5fc feat: Enhance AI assistant to summarize real-time loan and maintenance data, update logic, UI prompts, tests, and documentation`
   - `958e3aa chore: Add final project report and update environment configuration guidelines for local and cloud deployment`
-  - `31358ee feat: Enforce email verification for user access, update Firebase rules, add email verification flow, UI components, and tests`
 - **Cloud Run**: service `smart-inventory`, region `asia-southeast2`, revisi aktif `smart-inventory-00006-vrp` (100% traffic)
 - **Environment Variables (Kredensial Disamarkan untuk Keamanan)**:
   - Server Cloud Run: `GEMINI_API_KEY`: `AIzaSy***********************************`, `FIREBASE_API_KEY`: `AIzaSy***********************************`

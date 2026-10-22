@@ -3,6 +3,7 @@
 import { db, env, isFirebaseConfigured, push, update } from "./firebase.js";
 import { escapeHtml, formatMarkdown, toIsoDate, validateProposedItem } from "../inventory-logic.mjs";
 import { buildAiDataContext, isReadTool, runAiQuery } from "../ai-queries.mjs";
+import { AI_LIMITS, AI_OPTIONS, buildGeminiRequest } from "../ai-config.mjs";
 import { buildActionHistoryNote, prepareAiAction } from "../ai-actions.mjs";
 import { deleteBarang, inventarisRef, updateBarang } from "./inventaris.js";
 import { createPeminjaman, deletePeminjaman, updatePeminjaman } from "./peminjaman.js";
@@ -223,218 +224,11 @@ function hideTypingIndicator() {
 // Gemini hanya mengusulkan perubahan; data baru ditulis ke database
 // setelah petugas menekan tombol konfirmasi pada kartu di chat.
 // -------------------------------------------------------------
-// Pilihan kategori & kondisi diambil dari form Tambah Barang agar selalu sama
-const KATEGORI_OPTIONS = Array.from(document.getElementById("kategori").options).map(o => o.value).filter(Boolean);
-const KONDISI_OPTIONS = Array.from(document.getElementById("kondisi").options).map(o => o.value).filter(Boolean);
-
-// Pilihan status & jenis diambil dari form Peminjaman/Perawatan agar selalu sama
-const optionValues = (id) => Array.from(document.getElementById(id).options).map(o => o.value).filter(Boolean);
-const AI_OPTIONS = {
-  kategori: KATEGORI_OPTIONS,
-  kondisi: KONDISI_OPTIONS,
-  statusPeminjaman: optionValues("peminjamanStatus"),
-  jenisPerawatan: optionValues("perawatanJenis"),
-  statusPerawatan: optionValues("perawatanStatus")
-};
-
-const idParam = (description) => ({ type: "string", description: `${description} Salin persis dari [ID: ...] pada data.` });
-const dateParam = (description) => ({ type: "string", description: `${description} Format YYYY-MM-DD.` });
-const KONFIRMASI = "Data BELUM berubah sampai petugas menekan tombol konfirmasi pada kartu.";
-
-// Usulan ubah/hapus barang dan catat/ubah/hapus peminjaman & perawatan (lihat src/ai-actions.mjs)
-const ACTION_DECLARATIONS = [
-  {
-    name: "usulkanUbahBarang",
-    description: `Menampilkan kartu konfirmasi perubahan data satu barang. Isi hanya field yang berubah. ${KONFIRMASI}`,
-    parameters: {
-      type: "object",
-      properties: {
-        barangId: idParam("ID barang di inventaris."),
-        namaBarang: { type: "string", description: "Nama barang baru." },
-        kategori: { type: "string", enum: KATEGORI_OPTIONS },
-        jumlah: { type: "integer", description: "Jumlah unit fisik, minimal 1." },
-        kondisi: { type: "string", enum: KONDISI_OPTIONS },
-        lokasi: { type: "string", description: "Nama ruangan atau lokasi penyimpanan." }
-      },
-      required: ["barangId"]
-    }
-  },
-  {
-    name: "usulkanHapusBarang",
-    description: `Menampilkan kartu konfirmasi penghapusan satu barang beserta seluruh catatan peminjaman & perawatannya. ${KONFIRMASI}`,
-    parameters: { type: "object", properties: { barangId: idParam("ID barang di inventaris.") }, required: ["barangId"] }
-  },
-  {
-    name: "usulkanPeminjaman",
-    description: `Menampilkan kartu konfirmasi pencatatan peminjaman baru (status Dipinjam). ${KONFIRMASI}`,
-    parameters: {
-      type: "object",
-      properties: {
-        barangId: idParam("ID barang yang dipinjam."),
-        peminjam: { type: "string", description: "Nama peminjam." },
-        jumlah: { type: "integer", description: "Jumlah unit yang dipinjam, minimal 1." },
-        tanggalPinjam: dateParam("Tanggal pinjam; kosongkan untuk hari ini."),
-        tanggalKembali: dateParam("Batas tanggal kembali.")
-      },
-      required: ["barangId", "peminjam", "tanggalKembali"]
-    }
-  },
-  {
-    name: "usulkanUbahPeminjaman",
-    description: `Menampilkan kartu konfirmasi perubahan satu catatan peminjaman, termasuk menandai barang sudah dikembalikan (status Dikembalikan). Isi hanya field yang berubah. ${KONFIRMASI}`,
-    parameters: {
-      type: "object",
-      properties: {
-        peminjamanId: idParam("ID catatan peminjaman."),
-        peminjam: { type: "string", description: "Nama peminjam." },
-        jumlah: { type: "integer", description: "Jumlah unit, minimal 1." },
-        tanggalPinjam: dateParam("Tanggal pinjam."),
-        tanggalKembali: dateParam("Batas tanggal kembali."),
-        status: { type: "string", enum: AI_OPTIONS.statusPeminjaman }
-      },
-      required: ["peminjamanId"]
-    }
-  },
-  {
-    name: "usulkanHapusPeminjaman",
-    description: `Menampilkan kartu konfirmasi penghapusan satu catatan peminjaman. ${KONFIRMASI}`,
-    parameters: { type: "object", properties: { peminjamanId: idParam("ID catatan peminjaman.") }, required: ["peminjamanId"] }
-  },
-  {
-    name: "usulkanPerawatan",
-    description: `Menampilkan kartu konfirmasi pencatatan perawatan baru (servis rutin, perbaikan, atau kalibrasi). ${KONFIRMASI}`,
-    parameters: {
-      type: "object",
-      properties: {
-        barangId: idParam("ID barang yang dirawat."),
-        jenis: { type: "string", enum: AI_OPTIONS.jenisPerawatan },
-        deskripsi: { type: "string", description: "Deskripsi pekerjaan perawatan." },
-        tanggal: dateParam("Tanggal perawatan; kosongkan untuk hari ini."),
-        biaya: { type: "integer", description: "Biaya dalam Rupiah, minimal 0." },
-        status: { type: "string", enum: AI_OPTIONS.statusPerawatan }
-      },
-      required: ["barangId", "jenis", "deskripsi"]
-    }
-  },
-  {
-    name: "usulkanUbahPerawatan",
-    description: `Menampilkan kartu konfirmasi perubahan satu catatan perawatan. Isi hanya field yang berubah. ${KONFIRMASI}`,
-    parameters: {
-      type: "object",
-      properties: {
-        perawatanId: idParam("ID catatan perawatan."),
-        jenis: { type: "string", enum: AI_OPTIONS.jenisPerawatan },
-        deskripsi: { type: "string", description: "Deskripsi pekerjaan perawatan." },
-        tanggal: dateParam("Tanggal perawatan."),
-        biaya: { type: "integer", description: "Biaya dalam Rupiah, minimal 0." },
-        status: { type: "string", enum: AI_OPTIONS.statusPerawatan }
-      },
-      required: ["perawatanId"]
-    }
-  },
-  {
-    name: "usulkanHapusPerawatan",
-    description: `Menampilkan kartu konfirmasi penghapusan satu catatan perawatan. ${KONFIRMASI}`,
-    parameters: { type: "object", properties: { perawatanId: idParam("ID catatan perawatan.") }, required: ["perawatanId"] }
-  }
-];
-
-// Fungsi baca: dijalankan aplikasi pada data realtime, hasilnya dikirim kembali ke Gemini (lihat src/ai-queries.mjs)
-const limitParam = { type: "integer", description: "Jumlah maksimum baris daftar (bawaan 50, maksimum 200). Total tetap dihitung dari semua hasil." };
-const READ_DECLARATIONS = [
-  {
-    name: "cariBarang",
-    description: "Mencari barang inventaris beserta ID, jumlah unit, unit yang sedang dipinjam, dan unit tersedia, serta total unit hasil pencarian. Semua filter opsional; tanpa filter = semua barang.",
-    parameters: {
-      type: "object",
-      properties: {
-        kata: { type: "string", description: "Potongan nama barang atau lokasi (tidak peka huruf besar/kecil)." },
-        kategori: { type: "string", enum: KATEGORI_OPTIONS },
-        kondisi: { type: "string", enum: KONDISI_OPTIONS },
-        lokasi: { type: "string", description: "Potongan nama lokasi/ruangan." },
-        batas: limitParam
-      }
-    }
-  },
-  {
-    name: "cariPeminjaman",
-    description: "Mencari catatan peminjaman beserta ID, nama barang, status, dan jumlah hari keterlambatan, serta total unit hasil pencarian. Semua filter opsional.",
-    parameters: {
-      type: "object",
-      properties: {
-        status: { type: "string", enum: AI_OPTIONS.statusPeminjaman },
-        terlambat: { type: "boolean", description: "true = hanya yang terlambat dikembalikan; false = hanya yang tidak terlambat." },
-        peminjam: { type: "string", description: "Potongan nama peminjam." },
-        barangId: { type: "string", description: "ID barang." },
-        kataBarang: { type: "string", description: "Potongan nama barang." },
-        dariTanggal: dateParam("Tanggal pinjam paling awal."),
-        sampaiTanggal: dateParam("Tanggal pinjam paling akhir."),
-        batas: limitParam
-      }
-    }
-  },
-  {
-    name: "cariPerawatan",
-    description: "Mencari catatan perawatan beserta ID, nama barang, biaya, dan status, serta total biaya hasil pencarian. Semua filter opsional.",
-    parameters: {
-      type: "object",
-      properties: {
-        status: { type: "string", enum: AI_OPTIONS.statusPerawatan },
-        jenis: { type: "string", enum: AI_OPTIONS.jenisPerawatan },
-        barangId: { type: "string", description: "ID barang." },
-        kata: { type: "string", description: "Potongan nama barang atau deskripsi pekerjaan." },
-        dariTanggal: dateParam("Tanggal perawatan paling awal."),
-        sampaiTanggal: dateParam("Tanggal perawatan paling akhir."),
-        batas: limitParam
-      }
-    }
-  },
-  {
-    name: "rekapInventaris",
-    description: "Merekap barang per kategori, kondisi, atau lokasi: jumlah jenis barang, total unit, unit dipinjam, dan unit tersedia per kelompok. Filter opsional.",
-    parameters: {
-      type: "object",
-      properties: {
-        kelompokkan: { type: "string", enum: ["kategori", "kondisi", "lokasi"] },
-        kategori: { type: "string", enum: KATEGORI_OPTIONS },
-        kondisi: { type: "string", enum: KONDISI_OPTIONS },
-        lokasi: { type: "string", description: "Potongan nama lokasi/ruangan." }
-      },
-      required: ["kelompokkan"]
-    }
-  }
-];
+// Pilihan form, deklarasi alat, dan instruksi Gemini ada di src/ai-config.mjs (dipakai juga oleh server)
+const { kategori: KATEGORI_OPTIONS, kondisi: KONDISI_OPTIONS } = AI_OPTIONS;
 
 // Batas langkah fungsi baca per pertanyaan agar tidak berputar tanpa akhir
 const MAX_TOOL_STEPS = 5;
-
-const GEMINI_TOOLS = [{
-  function_declarations: [{
-    name: "usulkanTambahBarang",
-    description: "Menampilkan draft barang baru kepada petugas sebagai kartu konfirmasi. Data BELUM tersimpan sampai petugas menekan tombol Simpan pada kartu.",
-    parameters: {
-      type: "object",
-      properties: {
-        items: {
-          type: "array",
-          description: "Daftar barang yang akan ditambahkan, satu entri per jenis barang.",
-          items: {
-            type: "object",
-            properties: {
-              namaBarang: { type: "string", description: "Nama barang, misalnya 'Laptop Asus Vivobook 14'." },
-              kategori: { type: "string", enum: KATEGORI_OPTIONS, description: "Kategori barang." },
-              jumlah: { type: "integer", description: "Jumlah unit fisik, minimal 1." },
-              kondisi: { type: "string", enum: KONDISI_OPTIONS, description: "Kondisi barang." },
-              lokasi: { type: "string", description: "Nama ruangan atau lokasi penyimpanan." }
-            },
-            required: ["namaBarang", "kategori", "jumlah", "kondisi", "lokasi"]
-          }
-        }
-      },
-      required: ["items"]
-    }
-  }, ...ACTION_DECLARATIONS, ...READ_DECLARATIONS]
-}];
 
 // Catatan usulan untuk riwayat chat. Disimpan sebagai teks (bukan functionCall)
 // agar riwayat tetap valid walaupun model fallback berganti di tengah percakapan.
@@ -688,7 +482,8 @@ function appendActionCard(call, setNote) {
   scrollToBottom();
 }
 
-// Kirim satu request generateContent: lewat proxy server (build Cloud Run) atau langsung ke Google
+// Kirim satu request generateContent. Build Cloud Run: percakapan & data ke proxy, server menyusun instruksi
+// dan alat. Mode lokal: request lengkap disusun di browser dengan modul yang sama, lalu langsung ke Google.
 async function callGeminiModel(model, payload, apiKey) {
   if (GEMINI_PROXY_URL) {
     const idToken = await state.currentUser.getIdToken();
@@ -703,53 +498,14 @@ async function callGeminiModel(model, payload, apiKey) {
   return fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(buildGeminiRequest(payload))
   });
 }
 
 // Panggil Endpoint Gemini API (dengan Auto-Fallback Model)
 async function requestGeminiAPI(conversationHistory, modelToUse, apiKey) {
-  const dataContext = buildAiDataContext(aiContext());
-  const systemInstruction = {
-    parts: [
-      {
-        text: `Anda adalah "Asisten AI Inventaris Cerdas" untuk Sistem Inventaris Barang Laboratorium & Kantor.
-Tugas utama Anda:
-1. Menjawab pertanyaan pengguna seputar ketersediaan stok, jumlah unit, sebaran lokasi ruangan, dan kondisi barang (Baik, Rusak Ringan, Rusak Berat), serta peminjaman (peminjam, unit tersedia, batas kembali, keterlambatan) dan riwayat perawatan barang berdasarkan DATA REALTIME di bawah.
-2. Memberikan rekomendasi jadwal pemeliharaan alat dengan memperhatikan riwayat perawatan yang tercatat, SOP operasional laboratorium/kantor, serta usulan tindakan perbaikan untuk barang yang rusak.
-3. Membantu membuat rekap atau draft laporan inventaris yang rapi jika diminta oleh petugas.
-4. Gunakan Bahasa Indonesia yang ramah, profesional, ringkas, dan solutif.
-5. Format teks dengan rapi menggunakan Markdown (gunakan bullet points, bold untuk penekanan, atau tabel ringkas bila relevan).
-6. Jika petugas meminta menambahkan barang baru, panggil fungsi usulkanTambahBarang berisi semua barang yang diminta. Fungsi ini hanya menampilkan draft; barang baru tersimpan setelah petugas menekan tombol "Simpan" pada kartu konfirmasi. Jangan pernah menyatakan barang sudah tersimpan.
-   - Nama barang dan lokasi wajib jelas. Jika belum disebutkan, tanyakan dulu dan jangan menebak.
-   - Jika jumlah tidak disebutkan, gunakan 1. Jika kondisi tidak disebutkan, gunakan "Baik".
-   - Pilih kategori yang paling sesuai dari pilihan yang tersedia.
-   - Jika lokasi yang disebut merujuk ke ruangan yang sudah ada di data, tulis nama lokasinya persis seperti di data.
-7. Untuk perubahan data lainnya, panggil fungsi usulan yang sesuai: usulkanUbahBarang, usulkanHapusBarang, usulkanPeminjaman, usulkanUbahPeminjaman (termasuk menandai barang sudah dikembalikan), usulkanHapusPeminjaman, usulkanPerawatan, usulkanUbahPerawatan, dan usulkanHapusPerawatan. Semua fungsi ini hanya menampilkan kartu konfirmasi; data baru berubah setelah petugas menekan tombol konfirmasi. Jangan pernah menyatakan data sudah berubah atau terhapus.
-   - Gunakan ID persis seperti pada data ([ID: ...]). Jika barang atau catatan yang dimaksud tidak ditemukan atau ada lebih dari satu kandidat, tanyakan dulu dan jangan menebak.
-   - Untuk perubahan, isi hanya field yang berubah.
-   - Tulis tanggal dengan format YYYY-MM-DD dan gunakan "Tanggal hari ini" pada data sebagai acuan. Jika batas kembali peminjaman belum disebutkan, tanyakan dulu.
-   - Hanya usulkan penghapusan jika petugas memang memintanya. Menghapus barang juga menghapus seluruh catatan peminjaman dan perawatannya.
-8. Baris berawalan [SISTEM] di riwayat percakapan dibuat otomatis oleh aplikasi. Jangan menulis baris seperti itu sendiri.
-9. Untuk pertanyaan yang membutuhkan angka, rekap, filter, atau detail data (misalnya jumlah unit, unit tersedia, total biaya, barang di lokasi tertentu, peminjaman yang terlambat), panggil fungsi baca cariBarang, cariPeminjaman, cariPerawatan, atau rekapInventaris, lalu jawab berdasarkan hasilnya. Jangan menghitung sendiri dari daftar. Fungsi baca juga dapat dipakai untuk menemukan ID sebelum mengusulkan perubahan.
-
-${dataContext}
-
-Catatan penting:
-Jika barang atau ruangan yang ditanyakan tidak ada di data di atas maupun di hasil fungsi cariBarang, jawab dengan ramah bahwa barang atau ruangan tersebut saat ini belum terdaftar di sistem inventaris.`
-      }
-    ]
-  };
-
-  const payload = {
-    system_instruction: systemInstruction,
-    contents: conversationHistory,
-    tools: GEMINI_TOOLS,
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 2048
-    }
-  };
+  // Browser hanya mengirim percakapan & ringkasan data; instruksi dan alat disusun dari src/ai-config.mjs
+  const payload = { contents: conversationHistory, dataContext: buildAiDataContext(aiContext()) };
 
   // Model fallback chain: mulai dari model terbaru
   const candidateModels = [
@@ -841,6 +597,10 @@ Jika barang atau ruangan yang ditanyakan tidak ada di data di atas maupun di has
 export async function handleUserMessage(promptText) {
   const text = promptText.trim();
   if (!text || isGeminiWaiting) return;
+  if (text.length > AI_LIMITS.maxUserMessageChars) {
+    appendChatMessage("bot", `⚠️ Pesan terlalu panjang. Maksimal ${AI_LIMITS.maxUserMessageChars} karakter.`, false);
+    return;
+  }
 
   const apiKey = getActiveGeminiApiKey();
   const currentModel = getActiveGeminiModel();
